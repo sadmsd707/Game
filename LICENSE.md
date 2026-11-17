@@ -1,16 +1,14 @@
-Copyright (c) 2026 Shivraj Deshmukh (sadmsd707)
-
+Copyright (c) 2026 Shivraj Deshmukh
 All rights reserved.
 
-This software, including all source code, assets, documentation, and related files
-in this repository ("HeavyVehiclesWorld"), is the exclusive intellectual property
+This project — HeavyVehiclesWorld — including all source code, scripts, assets,
+documentation, and related files, is the sole and exclusive intellectual property
 of Shivraj Deshmukh.
 
-UNAUTHORIZED USE, COPYING, MODIFICATION, MERGING, PUBLISHING, DISTRIBUTION,
-SUBLICENSING, OR SELLING OF THIS SOFTWARE OR ANY PART OF IT IS STRICTLY PROHIBITED
-WITHOUT THE PRIOR WRITTEN PERMISSION OF THE COPYRIGHT OWNER.
+NO PERMISSION is granted to any person or organization to use, copy, modify, merge,
+publish, distribute, sublicense, sell, or otherwise exploit this software or any
+part of it without the explicit prior written consent of Shivraj Deshmukh.
 
-This project is NOT open source. No license is granted to any third party to use,
-copy, modify, or distribute this code in any form.
+This is a PROPRIETARY project. It is NOT open source.
 
-For permissions, contact: sadmsd707@users.noreply.github.com
+© 2026 Shivraj Deshmukh — All Rights Reserved.

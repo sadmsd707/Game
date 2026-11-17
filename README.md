@@ -156,7 +156,7 @@ HeavyVehiclesWorld/
 ```
 1. File → Build Settings → Switch Platform → Android
 2. Player Settings:
-   - Company Name: HeavyVehiclesStudio
+   - Company Name: Shivraj Deshmukh
    - Product Name: HeavyVehiclesWorld
    - Package Name: com.heavyvehicles.world
    - Version: 1.0 / Bundle Version Code: 1
@@ -211,4 +211,4 @@ HeavyVehiclesWorld/
 
 ---
 
-*HeavyVehiclesWorld © 2026 HeavyVehiclesStudio. All rights reserved.*
+*HeavyVehiclesWorld © 2026 Shivraj Deshmukh. All rights reserved. Unauthorized copying, distribution, or use of this project is strictly prohibited.*
