@@ -454,3 +454,35 @@ public static void BuildWindows()
 **Why:** Bug fix & build creation: eliminated all script compilation errors in Unity 6 and generated the executable game build for PC as requested.
 **Related to:** All vehicles, UI, World, Systems, Build automation
 ---
+
+### Change #25 | 2026-11-18 13:12
+**Files changed:**
+- Assets/Editor/HVW_BatchBuild.cs (MODIFIED)
+- Install_Android_Support.bat (NEW)
+- Build_Production_APK.bat (NEW)
+**What changed:** 
+- Configured automated Production APK build method `HVW_BatchBuild.BuildProductionAPK` for signed ARM64 IL2CPP Android release.
+- Linked production keystore `HVW_Production.keystore` (alias: `hvw_production`, RSA 2048-bit, 10,000 days validity, owned by Shivraj Deshmukh).
+- Installed Unity CLI 1.0.1 for win32-arm64 architecture.
+- Created 1-click elevated installer script `Install_Android_Support.bat` on Desktop and project root to install Unity Android Build Support module.
+- Created 1-click batch build runner `Build_Production_APK.bat` on Desktop and project root to output `Builds/Android/HeavyVehiclesWorld_Production.apk`.
+**New code:**
+```csharp
+// HVW_BatchBuild.cs - BuildProductionAPK
+[MenuItem("Tools/HeavyVehiclesWorld/📦 Build Production APK (Signed Release)")]
+public static void BuildProductionAPK()
+{
+    PlayerSettings.companyName = "Shivraj Deshmukh";
+    PlayerSettings.productName = "HeavyVehiclesWorld";
+    PlayerSettings.applicationIdentifier = "com.heavyvehicles.world";
+    PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
+    PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+    PlayerSettings.Android.useCustomKeystore = true;
+    PlayerSettings.Android.keystoreName = keystorePath;
+    PlayerSettings.Android.keyaliasName = "hvw_production";
+    ...
+}
+```
+**Why:** Android Production Release preparation: provides 1-click tools and automated headless build pipeline for signed release APK generation.
+**Related to:** Android build, production release, keystore, automation
+---
