@@ -122,6 +122,9 @@ public static class HVW_BatchBuild
         string outputPath = Path.Combine(outputDir, "HeavyVehiclesWorld_Production.apk");
         Directory.CreateDirectory(outputDir);
 
+        // Ensure MainWorld scene is fully populated with all vehicles, camera, and mobile touch UI
+        HeavyVehiclesWorld.EditorTools.HVW_SceneGenerator.GenerateAndSaveMainWorld();
+
         var scenes = GetScenesList();
         Debug.Log($"[HVW] Building Production APK: {outputPath}");
         Debug.Log($"[HVW] Scenes: {string.Join(", ", scenes)}");

@@ -18,6 +18,14 @@ namespace HeavyVehiclesWorld.Controls
         // once the Input Actions asset is created in the Unity Editor.
         private HeavyVehiclesInputActions _actions;
 
+        // ── Mobile Inputs ────────────────────────────────────────────────
+        public float MobileThrottle { get; set; }
+        public float MobileBrake    { get; set; }
+        public float MobileSteer    { get; set; }
+        public float MobileHandbrake{ get; set; }
+        public Vector2 MobileLeftJoystick { get; set; }
+        public Vector2 MobileRightJoystick { get; set; }
+
         // ── Axes ──────────────────────────────────────────────────────────
         public float MoveX    { get; private set; }
         public float MoveY    { get; private set; }
@@ -94,6 +102,25 @@ namespace HeavyVehiclesWorld.Controls
             // Touch joysticks
             LeftJoystick  = player.Move.ReadValue<Vector2>();
             RightJoystick = vehicle.ArmControl.ReadValue<Vector2>();
+
+            // Apply Mobile Overrides if active
+            if (Mathf.Abs(MobileThrottle) > 0.01f || Mathf.Abs(MobileBrake) > 0.01f || Mathf.Abs(MobileSteer) > 0.01f || MobileHandbrake > 0.01f || MobileLeftJoystick.sqrMagnitude > 0.01f || MobileRightJoystick.sqrMagnitude > 0.01f)
+            {
+                if (Mathf.Abs(MobileThrottle) > 0.01f) Throttle = MobileThrottle;
+                if (Mathf.Abs(MobileBrake) > 0.01f) Brake = MobileBrake;
+                if (Mathf.Abs(MobileSteer) > 0.01f)
+                {
+                    Steer = MobileSteer;
+                    MoveX = MobileSteer;
+                }
+                if (MobileHandbrake > 0.01f) Handbrake = MobileHandbrake;
+                MoveY = Throttle - Brake;
+
+                if (MobileLeftJoystick.sqrMagnitude > 0.01f) LeftJoystick = MobileLeftJoystick;
+                else LeftJoystick = new Vector2(Steer, MoveY);
+
+                if (MobileRightJoystick.sqrMagnitude > 0.01f) RightJoystick = MobileRightJoystick;
+            }
         }
 
         private void ReadButtons()

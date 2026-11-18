@@ -208,12 +208,20 @@ namespace HeavyVehiclesWorld.Vehicles
     }
 
     // ── InputManager proxy (safe stub if InputManager not yet present) ────
-    internal static class InputManagerProxy
+    public static class InputManagerProxy
     {
+        public static float MobileThrottle = 0f;
+        public static float MobileBrake    = 0f;
+        public static float MobileSteer    = 0f;
+        public static float MobileHandBrake = 0f;
+        public static bool  MobileHeadlights = false;
+        public static bool  MobileHorn = false;
+
         public static float Throttle
         {
             get
             {
+                if (Mathf.Abs(MobileThrottle) > 0.01f) return MobileThrottle;
 #if ENABLE_INPUT_SYSTEM
                 var gp = UnityEngine.InputSystem.Gamepad.current;
                 if (gp != null) return gp.rightTrigger.ReadValue();
@@ -229,6 +237,7 @@ namespace HeavyVehiclesWorld.Vehicles
         {
             get
             {
+                if (Mathf.Abs(MobileBrake) > 0.01f) return MobileBrake;
 #if ENABLE_INPUT_SYSTEM
                 var gp = UnityEngine.InputSystem.Gamepad.current;
                 if (gp != null) return gp.leftTrigger.ReadValue();
@@ -244,6 +253,7 @@ namespace HeavyVehiclesWorld.Vehicles
         {
             get
             {
+                if (Mathf.Abs(MobileSteer) > 0.01f) return MobileSteer;
 #if ENABLE_INPUT_SYSTEM
                 var gp = UnityEngine.InputSystem.Gamepad.current;
                 if (gp != null) return gp.leftStick.x.ReadValue();
@@ -264,6 +274,7 @@ namespace HeavyVehiclesWorld.Vehicles
         {
             get
             {
+                if (MobileHandBrake > 0.1f) return MobileHandBrake;
 #if ENABLE_INPUT_SYSTEM
                 var gp = UnityEngine.InputSystem.Gamepad.current;
                 if (gp != null) return gp.buttonEast.isPressed ? 1f : 0f;
@@ -279,6 +290,11 @@ namespace HeavyVehiclesWorld.Vehicles
         {
             get
             {
+                if (MobileHeadlights)
+                {
+                    MobileHeadlights = false;
+                    return true;
+                }
 #if ENABLE_INPUT_SYSTEM
                 return UnityEngine.InputSystem.Keyboard.current != null
                     && UnityEngine.InputSystem.Keyboard.current.lKey.wasPressedThisFrame;
@@ -292,6 +308,7 @@ namespace HeavyVehiclesWorld.Vehicles
         {
             get
             {
+                if (MobileHorn) return true;
 #if ENABLE_INPUT_SYSTEM
                 var gp = UnityEngine.InputSystem.Gamepad.current;
                 if (gp != null) return gp.buttonNorth.isPressed;

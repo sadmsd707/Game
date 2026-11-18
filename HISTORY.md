@@ -518,3 +518,41 @@ public static void BuildProductionAPK()
 **Why:** Deliver the signed production-ready Android Release APK as requested by the user.
 **Related to:** Android build, production release, APK generation, IL2CPP ARM64, apksigner
 ---
+
+### Change #27: Complete 3D World Generation, All 6 Vehicles & Mobile Touch UI Integrated
+**When:** 2026-11-19
+**Files touched:**
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (NEW)
+- Assets/Scripts/Systems/HVW_FollowCamera.cs (NEW)
+- Assets/Editor/HVW_SceneGenerator.cs (NEW)
+- Assets/Scripts/Vehicles/CarController.cs (MODIFIED)
+- Assets/Scripts/Controls/InputManager.cs (MODIFIED)
+- Assets/Editor/HVW_BatchBuild.cs (MODIFIED)
+- Assets/Scenes/MainWorld.unity (MODIFIED)
+- Builds/Android/HeavyVehiclesWorld_Production.apk (MODIFIED - 34.86 MB)
+**What changed:**
+- Resolved blank sky issue upon launch: the scene previously had no instantiated vehicles, follow camera, or mobile touch controls.
+- Implemented `HVW_WorldInitializer`: auto-generates rich grass terrain, looping asphalt road circuit with lane markings and curbs, construction zone, wheat farm field, quarry, and 40+ roadside trees and props.
+- Spawns and configures all 6 vehicles in the world: Car (SUV), Tractor (with plough), Truck (tipper), JCB (backhoe loader), Excavator (tracked digger), and Combine Harvester.
+- Implemented `HVW_FollowCamera`: smooth vehicle-tracking camera attached to Main Camera with 3 selectable modes (Third Person Chase, Cockpit/Hood, Drone Top-Down).
+- Implemented complete on-screen mobile touch UI:
+  - Steer Left `[◀ STEER]` & Steer Right `[STEER ▶]` buttons on bottom-left.
+  - Gas pedal `[▲ GAS / ACCEL]` & Brake/Reverse pedal `[▼ BRAKE / REV]` on bottom-right.
+  - Handbrake `[🛑 HANDBRAKE]` button.
+  - Quick Vehicle Selector toolbar at top: `[🚗 CAR]`, `[🚜 TRACTOR]`, `[🚛 TRUCK]`, `[🏗️ JCB]`, `[⛏️ EXCAVATOR]`, `[🌾 HARVESTER]`.
+  - Camera View toggle `[📷 VIEW]` & vehicle reset `[🔄 RESET]`.
+  - Real-time speedometer, gear indicator, and vehicle name HUD.
+- Updated `InputManagerProxy` and `InputManager` to seamlessly bridge on-screen touch pedals/steering into vehicle physics controllers.
+- Integrated `HVW_SceneGenerator` into automated batch build pipeline and rebuilt signed production APK.
+**Artifact Details:**
+- Output Path: `Builds/Android/HeavyVehiclesWorld_Production.apk` (and copied to Desktop)
+- File Size: 36,556,412 bytes (34.86 MB)
+- Target Architecture: ARM64 (IL2CPP)
+- Graphics APIs: Vulkan, OpenGLES3
+- Minimum API Level: Android 7.0 (API 24)
+- Target API Level: Android 14 (API 34)
+- Keystore Owner: Shivraj Deshmukh
+- SHA-256 Checksum: `D4DDD5E4A74E542D64D8AED1D2CE2E07CE670E5C257FFA6478F55B82CACAAF67`
+**Why:** Fix blank sky screen by providing complete 3D environment, vehicles, follow camera, and on-screen mobile touch controls for Android gameplay.
+**Related to:** Mobile UI, touch controls, camera follow, world generation, Android APK
+---
