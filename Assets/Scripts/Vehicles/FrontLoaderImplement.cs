@@ -1,4 +1,6 @@
 using UnityEngine;
+using HeavyVehiclesWorld.World;
+using HeavyVehiclesWorld.Controls;
 
 namespace HeavyVehiclesWorld.Vehicles
 {
@@ -94,14 +96,14 @@ namespace HeavyVehiclesWorld.Vehicles
         public void RaiseArm()
         {
             if (armJoint != null)
-                armJoint.SetTargetAngleOffset(armSpeed * Time.deltaTime);
+                armJoint.AdjustTargetAngle(armSpeed * Time.deltaTime);
         }
 
         /// <summary>Lowers the loader arm.</summary>
         public void LowerArm()
         {
             if (armJoint != null)
-                armJoint.SetTargetAngleOffset(-armSpeed * Time.deltaTime);
+                armJoint.AdjustTargetAngle(-armSpeed * Time.deltaTime);
         }
 
         /// <summary>Sets the bucket tilt angle (0 = scooping, 60 = dump).</summary>

@@ -123,7 +123,7 @@ namespace HeavyVehiclesWorld.Vehicles
             rearLeft.brakeTorque   = brake + hbRear;
             rearRight.brakeTorque  = brake + hbRear;
 
-            currentSpeed = rb.velocity.magnitude * 3.6f; // km/h
+            currentSpeed = rb.linearVelocity.magnitude * 3.6f; // km/h
         }
 
         public override void ApplySteering()

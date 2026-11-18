@@ -3,7 +3,7 @@ using UnityEngine;
 #if UNITY_CINEMACHINE
 using Unity.Cinemachine;
 #else
-using Cinemachine;
+
 #endif
 
 namespace HeavyVehiclesWorld.Vehicles
@@ -28,9 +28,9 @@ namespace HeavyVehiclesWorld.Vehicles
 
         // ── Cinemachine virtual cameras ───────────────────────────────────
         [Header("Cinemachine Virtual Cameras")]
-        [SerializeField] private CinemachineVirtualCamera thirdPersonCamera;
-        [SerializeField] private CinemachineVirtualCamera firstPersonCamera;
-        [SerializeField] private CinemachineVirtualCamera freeLookCamera;
+        [SerializeField] private Unity.Cinemachine.CinemachineVirtualCamera thirdPersonCamera;
+        [SerializeField] private Unity.Cinemachine.CinemachineVirtualCamera firstPersonCamera;
+        [SerializeField] private Unity.Cinemachine.CinemachineVirtualCamera freeLookCamera;
 
         // ── Smooth parameters ─────────────────────────────────────────────
         [Header("Smooth Settings")]
@@ -147,7 +147,7 @@ namespace HeavyVehiclesWorld.Vehicles
                 thirdPersonCamera.m_Lens.FieldOfView, _currentFOV, Time.deltaTime * lookLerpSpeed);
 
             // Adjust body offset dynamically if Cinemachine body is Transposer
-            var transposer = thirdPersonCamera.GetCinemachineComponent<CinemachineTransposer>();
+            var transposer = thirdPersonCamera.GetCinemachineComponent<Unity.Cinemachine.CinemachineTransposer>();
             if (transposer != null)
             {
                 transposer.m_FollowOffset = Vector3.SmoothDamp(

@@ -52,6 +52,8 @@ namespace HeavyVehiclesWorld.Systems
         }
 
         /// <summary>Returns an object from the pool, expanding by 1 if empty.</summary>
+        public GameObject GetPooledObject(string tag) => GetFromPool(tag);
+
         public GameObject GetFromPool(string tag)
         {
             if (!_pools.TryGetValue(tag, out var queue))

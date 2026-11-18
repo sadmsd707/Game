@@ -158,7 +158,7 @@ namespace HeavyVehiclesWorld.Vehicles
                 new[] { frontLeft, frontRight, rearLeft, rearRight },
                 brakeInput * maxBrakeTorque);
 
-            currentSpeed = rb.velocity.magnitude * 3.6f;
+            currentSpeed = rb.linearVelocity.magnitude * 3.6f;
         }
 
         public override void ApplySteering()

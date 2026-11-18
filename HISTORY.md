@@ -387,3 +387,70 @@ System.GC.WaitForPendingFinalizers();
 **Related to:** Android build, documentation, copyright
 
 ---
+
+---
+### Change #24 | 2026-11-18 12:59
+**Files changed:**
+- Assets/Editor/HVW_BatchBuild.cs (NEW)
+- Assets/Scenes/MainWorld.unity (NEW)
+- Assets/Scripts/Vehicles/VehicleController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/WheelSuspensionData.cs (MODIFIED)
+- Assets/Scripts/Vehicles/HarvesterController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/TruckController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/ExcavatorController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/FrontLoaderImplement.cs (MODIFIED)
+- Assets/Scripts/Vehicles/PloughImplement.cs (MODIFIED)
+- Assets/Scripts/Vehicles/JCBDiggingSystem.cs (MODIFIED)
+- Assets/Scripts/Vehicles/ExcavatorPrefabSetupGuide.cs (MODIFIED)
+- Assets/Scripts/UI/VehicleHUD.cs (MODIFIED)
+- Assets/Scripts/UI/PauseMenu.cs (MODIFIED)
+- Assets/Scripts/UI/SettingsMenu.cs (MODIFIED)
+- Assets/Scripts/World/MinimapController.cs (MODIFIED)
+- Assets/Scripts/Systems/GameManager.cs (MODIFIED)
+- Assets/Scripts/Systems/MissionManager.cs (MODIFIED)
+- Assets/Scripts/Systems/ExcavationMission.cs (MODIFIED)
+- Assets/Scripts/Systems/TrenchMission.cs (MODIFIED)
+- Assets/Scripts/Systems/ObjectPooler.cs (MODIFIED)
+- Assets/Scripts/Systems/GraphicsSettingsManager.cs (MODIFIED)
+- Assets/Scripts/Systems/AndroidBuildValidator.cs (MODIFIED)
+- Assets/Scripts/Systems/FinalPerformancePass.cs (MODIFIED)
+**What changed:** 
+- Resolved all cross-namespace references and Unity 6 compiler compatibility across all 82 project scripts.
+- Added HUD convenience properties on `VehicleController`: `CurrentGear`, `MaxFuel`, `CurrentFuel`, `SpeedKmh`, `isEngineOn`, `throttleInput`, `brakeInput`, `MaxRPM`, `CurrentRPM`, `MaxHealth`, `CurrentHealth`, `Type`, `VehicleName`.
+- Added `UnregisterVehicle` on `GameManager` and `GetPooledObject` alias on `ObjectPooler`.
+- Added `AddPayload` on `TruckController` and `RaiseLowerHeader()` / `UnloadGrain()` on `HarvesterController`.
+- Added `AdjustTargetAngle` calls on `FrontLoaderImplement`.
+- Added `HVW_BatchBuild` automated builder and generated starter `MainWorld.unity` scene.
+- Successfully compiled entire game and built Windows Standalone 64-bit executable `Builds/Windows/HeavyVehiclesWorld.exe`.
+**New code:**
+```csharp
+// VehicleController.cs - HUD & input convenience accessors
+public float throttleInput;
+public float brakeInput;
+public float CurrentFuel => fuelLevel;
+public float MaxFuel => 100f;
+public GearState CurrentGear => currentGear;
+public string VehicleName => !string.IsNullOrEmpty(name) ? name : vehicleType.ToString();
+public float MaxRPM => maxRPM;
+public float CurrentRPM => engineRPM;
+public float MaxHealth => 100f;
+public float CurrentHealth => Mathf.Max(0f, 100f - damageLevel);
+public VehicleType Type => vehicleType;
+public bool isEngineOn => engineRunning;
+public float SpeedKmh => currentSpeed * 3.6f;
+
+// HVW_BatchBuild.cs - Automated standalone builder
+public static void BuildWindows()
+{
+    var opts = new BuildPlayerOptions {
+        scenes = scenes.ToArray(),
+        locationPathName = "Builds/Windows/HeavyVehiclesWorld.exe",
+        target = BuildTarget.StandaloneWindows64,
+        options = BuildOptions.None
+    };
+    BuildPipeline.BuildPlayer(opts);
+}
+```
+**Why:** Bug fix & build creation: eliminated all script compilation errors in Unity 6 and generated the executable game build for PC as requested.
+**Related to:** All vehicles, UI, World, Systems, Build automation
+---

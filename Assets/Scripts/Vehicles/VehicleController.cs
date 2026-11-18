@@ -38,6 +38,22 @@ namespace HeavyVehiclesWorld.Vehicles
         public bool isOccupied;
         public float currentSpeed;
         public float engineRPM;
+        public float maxRPM = 6000f;
+        public float throttleInput;
+        public float brakeInput;
+
+        // ── HUD Convenience Properties ─────────────────────────────────────
+        public float CurrentFuel => fuelLevel;
+        public float MaxFuel => 100f;
+        public GearState CurrentGear => currentGear;
+        public string VehicleName => !string.IsNullOrEmpty(name) ? name : vehicleType.ToString();
+        public float MaxRPM => maxRPM;
+        public float CurrentRPM => engineRPM;
+        public float MaxHealth => 100f;
+        public float CurrentHealth => Mathf.Max(0f, 100f - damageLevel);
+        public VehicleType Type => vehicleType;
+        public bool isEngineOn => engineRunning;
+        public float SpeedKmh => currentSpeed * 3.6f;
 
         // ── Physics ───────────────────────────────────────────────────────
         [Header("Wheel Colliders")]

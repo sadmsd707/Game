@@ -58,6 +58,17 @@ namespace HeavyVehiclesWorld.Vehicles
         public Transform tipperBed;
         public bool      isDumping;
         public float     tipperAngle;    // degrees: 0 = flat, 60 = fully raised
+
+        // ── Payload ───────────────────────────────────────────────────────
+        [Header("Cargo Payload")]
+        public float currentPayload;
+        public float maxPayload = 15000f; // 15 tons
+
+        public void AddPayload(float amount)
+        {
+            currentPayload = Mathf.Clamp(currentPayload + amount, 0f, maxPayload);
+            Debug.Log($"[TruckController] Added payload: {amount:F1}. Total: {currentPayload:F1}/{maxPayload:F1}");
+        }
         [SerializeField] private float tipperSpeed = 15f;
 
         // ── Lights ────────────────────────────────────────────────────────
@@ -144,7 +155,7 @@ namespace HeavyVehiclesWorld.Vehicles
                 rearRight.brakeTorque = handBrakeTorque;
             }
 
-            currentSpeed = rb.velocity.magnitude * 3.6f;
+            currentSpeed = rb.linearVelocity.magnitude * 3.6f;
         }
 
         public override void ApplySteering()

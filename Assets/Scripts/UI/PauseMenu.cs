@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using HeavyVehiclesWorld.Systems;
 
 namespace HeavyVehiclesWorld.UI
 {
@@ -89,13 +90,19 @@ namespace HeavyVehiclesWorld.UI
 
         private void OnSave()
         {
-            SaveSystem.SaveGame();
+            if (FullSaveLoadManager.Instance != null)
+                FullSaveLoadManager.Instance.SaveAll();
+            else
+                SaveSystem.SaveGame(new SaveData());
             Debug.Log("[PauseMenu] Game saved.");
         }
 
         private void OnLoad()
         {
-            SaveSystem.LoadGame();
+            if (FullSaveLoadManager.Instance != null)
+                FullSaveLoadManager.Instance.LoadAll();
+            else
+                SaveSystem.LoadGame();
             HidePause();
         }
 

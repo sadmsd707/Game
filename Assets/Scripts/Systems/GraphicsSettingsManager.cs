@@ -86,34 +86,34 @@ namespace HeavyVehiclesWorld.Systems
                 _                   => urpMedium
             };
             if (urpAsset != null)
-                GraphicsSettings.renderPipelineAsset = urpAsset;
+                GraphicsSettings.defaultRenderPipeline = urpAsset;
 
             // Post-processing per tier
             switch (level)
             {
                 case QualityLevel.Low:
-                    QualitySettings.shadows          = ShadowQuality.Disable;
+                    QualitySettings.shadows          = UnityEngine.ShadowQuality.Disable;
                     QualitySettings.shadowDistance   = 0f;
                     SetPostProcessing(bloom: false, motionBlur: false, dof: false);
                     SetLightmapMode(LightmapsMode.NonDirectional);
                     break;
 
                 case QualityLevel.Medium:
-                    QualitySettings.shadows          = ShadowQuality.HardOnly;
+                    QualitySettings.shadows          = UnityEngine.ShadowQuality.HardOnly;
                     QualitySettings.shadowDistance   = 80f;
                     SetPostProcessing(bloom: true, motionBlur: false, dof: false);
                     SetBloomIntensity(0.4f);
                     break;
 
                 case QualityLevel.High:
-                    QualitySettings.shadows          = ShadowQuality.All;
+                    QualitySettings.shadows          = UnityEngine.ShadowQuality.All;
                     QualitySettings.shadowDistance   = 150f;
                     SetPostProcessing(bloom: true, motionBlur: false, dof: true);
                     SetBloomIntensity(0.7f);
                     break;
 
                 case QualityLevel.Ultra:
-                    QualitySettings.shadows          = ShadowQuality.All;
+                    QualitySettings.shadows          = UnityEngine.ShadowQuality.All;
                     QualitySettings.shadowDistance   = 250f;
                     SetPostProcessing(bloom: true, motionBlur: true, dof: true);
                     SetBloomIntensity(1.0f);

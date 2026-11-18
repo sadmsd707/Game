@@ -146,6 +146,9 @@ namespace HeavyVehiclesWorld.Vehicles
 
         // ── Header control ─────────────────────────────────────────────────
 
+        /// <summary>Toggle or explicitly raise / lower the cutting header.</summary>
+        public void RaiseLowerHeader() => RaiseLowerHeader(!headerLowered);
+
         /// <summary>Raise or lower the cutting header.</summary>
         /// <param name="lower">true = lower to field height; false = raise for transport.</param>
         public void RaiseLowerHeader(bool lower)
@@ -217,6 +220,12 @@ namespace HeavyVehiclesWorld.Vehicles
             if (isUnloading) StopUnloading();
             augerExtended   = false;
             _augerTargetRot = Quaternion.Euler(augerRetractedLocalRot);
+        }
+
+        public void UnloadGrain()
+        {
+            if (isUnloading) StopUnloading();
+            else StartUnloading();
         }
 
         public void StartUnloading()

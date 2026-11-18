@@ -1,4 +1,5 @@
 using UnityEngine;
+using HeavyVehiclesWorld.World;
 
 namespace HeavyVehiclesWorld.Vehicles
 {

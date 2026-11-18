@@ -21,8 +21,8 @@ namespace HeavyVehiclesWorld.Vehicles
             var rb = GetComponent<Rigidbody>();
             if (rb != null)
             {
-                rb.drag         = linearDrag;
-                rb.angularDrag  = angularDrag;
+                rb.linearDamping         = linearDrag;
+                rb.angularDamping  = angularDrag;
                 rb.centerOfMass = centreOfMass;
             }
 

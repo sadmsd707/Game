@@ -169,7 +169,7 @@ namespace HeavyVehiclesWorld.UI
                 QualitySettings.SetQualityLevel(q, true);
 
                 if (GraphicsSettingsManager.Instance != null)
-                    GraphicsSettingsManager.Instance.ApplyQuality(q);
+                    GraphicsSettingsManager.Instance.ApplyQuality((HeavyVehiclesWorld.Systems.QualityLevel)q);
             }
 
             // FPS cap

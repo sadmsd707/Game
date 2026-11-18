@@ -21,8 +21,8 @@ namespace HeavyVehiclesWorld.Vehicles
     {
         // ── Track WheelColliders (4 per side, acting as bogies) ────────────
         [Header("Excavator – Tracks (WheelCollider bogies)")]
-        [SerializeField] private WheelCollider[] leftTrackWheels  = new WheelCollider[4];
-        [SerializeField] private WheelCollider[] rightTrackWheels = new WheelCollider[4];
+        [SerializeField] public WheelCollider[] leftTrackWheels  = new WheelCollider[4];
+        [SerializeField] public WheelCollider[] rightTrackWheels = new WheelCollider[4];
 
         [SerializeField] private float trackMotorTorque = 3000f;
         [SerializeField] private float trackBrakeTorque = 5000f;
@@ -34,22 +34,22 @@ namespace HeavyVehiclesWorld.Vehicles
 
         // ── Cabin rotation ─────────────────────────────────────────────────
         [Header("Excavator – Cabin")]
-        [SerializeField] private Transform cabinTransform;
+        [SerializeField] public Transform cabinTransform;
         [SerializeField] private float cabinRotateSpeed = 60f;    // deg/s
 
         private float _cabinAngle;
 
         // ── Arm chain ──────────────────────────────────────────────────────
         [Header("Excavator – Arm")]
-        [SerializeField] private HydraulicArm boomArm;      // -10 to 70°
-        [SerializeField] private HydraulicArm stickArm;     // 0 to 120°
-        [SerializeField] private HydraulicArm bucketArm;    // -40 to 90°
+        [SerializeField] public HydraulicArm boomArm;      // -10 to 70°
+        [SerializeField] public HydraulicArm stickArm;     // 0 to 120°
+        [SerializeField] public HydraulicArm bucketArm;    // -40 to 90°
 
-        [SerializeField] private Transform bucketTip;       // world pos used for dig detection
+        [SerializeField] public Transform bucketTip;       // world pos used for dig detection
 
         // ── Terrain deformer ───────────────────────────────────────────────
         [Header("Excavator – Terrain")]
-        [SerializeField] private TerrainDeformer terrainDeformer;
+        [SerializeField] public TerrainDeformer terrainDeformer;
         [SerializeField] private float digRadius       = 0.6f;
         [SerializeField] private float digDepth        = 0.5f;
         [SerializeField] private float digGroundOffset = 0.3f;  // bucket tip height threshold for digging

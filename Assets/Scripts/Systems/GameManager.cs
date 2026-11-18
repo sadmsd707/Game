@@ -66,6 +66,12 @@ namespace HeavyVehiclesWorld.Systems
                 _vehicles.Add(v);
         }
 
+        public void UnregisterVehicle(VehicleController v)
+        {
+            if (_vehicles.Contains(v))
+                _vehicles.Remove(v);
+        }
+
         public void SwitchVehicle(VehicleController v)
         {
             CurrentVehicle = v;

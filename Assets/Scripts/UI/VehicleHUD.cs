@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using HeavyVehiclesWorld.Vehicles;
 
 namespace HeavyVehiclesWorld.UI
 {

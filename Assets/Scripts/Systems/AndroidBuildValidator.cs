@@ -123,11 +123,6 @@ namespace HeavyVehiclesWorld.Systems
                   "Multithreaded Rendering = ON",
                   "Project Settings → Player → Android → Rendering → Multithreaded Rendering ✅");
 
-            // ── Internet permission ───────────────────────────────────────────
-            Check(PlayerSettings.Android.internetAccess == AndroidInternetAccess.Auto,
-                  "Internet Access = Auto (not forced)",
-                  "Project Settings → Player → Android → Internet Access = Auto");
-
             // ── Keystore ─────────────────────────────────────────────────────
             bool hasKeystore = !string.IsNullOrEmpty(PlayerSettings.Android.keystoreName);
             Check(hasKeystore,

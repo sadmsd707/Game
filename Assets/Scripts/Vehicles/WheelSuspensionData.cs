@@ -24,7 +24,6 @@ namespace HeavyVehiclesWorld.Vehicles
         // Factory Presets
         // ------------------------------------------------------------------ //
 
-        [Header("Pre-sets")]
         public static WheelSuspensionData CarPreset()
         {
             var d = CreateInstance<WheelSuspensionData>();

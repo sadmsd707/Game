@@ -17,7 +17,7 @@ namespace HeavyVehiclesWorld.Systems
     {
         [Header("Shader Warm-up")]
         [Tooltip("Assign a ShaderVariantCollection asset containing all shaders used in the game.")]
-        [SerializeField] private UnityEngine.Rendering.ShaderVariantCollection shaderVariants;
+        [SerializeField] private ShaderVariantCollection shaderVariants;
 
         [Header("Warm-up Settings")]
         [SerializeField] private bool warmUpOnAwake       = true;
