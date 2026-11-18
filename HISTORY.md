@@ -556,3 +556,119 @@ public static void BuildProductionAPK()
 **Why:** Fix blank sky screen by providing complete 3D environment, vehicles, follow camera, and on-screen mobile touch controls for Android gameplay.
 **Related to:** Mobile UI, touch controls, camera follow, world generation, Android APK
 ---
+
+
+### Change #28 | 2026-11-19 01:55:00
+**Files changed:**
+- Assets/Scripts/Vehicles/VehicleModelSlot.cs (NEW)
+- Assets/Scripts/Systems/HVW_VisualSystem.cs (NEW)
+- ASSET_INTEGRATION_GUIDE.md (NEW)
+- Assets/Scripts/Systems/PrimitiveMeshBuilder.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Scripts/Vehicles/CarController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/TruckController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/TractorController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/JCBController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/ExcavatorController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/HarvesterController.cs (MODIFIED)
+- Assets/Editor/HVW_SceneGenerator.cs (MODIFIED)
+- Builds/Android/HeavyVehiclesWorld_Production.apk (MODIFIED - 34.87 MB)
+
+**What changed:**
+1. **Asset Integration System (VehicleModelSlot)**:
+   - Deprecated `PrimitiveMeshBuilder` and eliminated all procedural cube/cylinder primitive art generation.
+   - Implemented `VehicleModelSlot.cs`: each vehicle entity contains an empty `"Model"` child transform where imported 3D models (.fbx/.obj/.gltf) are parented.
+   - Synchronizes visual wheel transforms to physics `WheelCollider`s at runtime using `WheelCollider.GetWorldPose()`.
+   - Added automated part auto-detection and rigging slots for all heavy machinery attachments: `rotatingCabin`, `boomArm`, `stickArm`, `bucket`, `frontLoaderBoom`, `frontLoaderBucket`, `tipperBed`, `threePointHitch`, `cutterHeader`, and `unloadAuger`.
+   - Missing Asset Warning: When a model slot is empty, logs an actionable console instruction detailing the exact target directory (`Assets/Models/Vehicles/<VehicleType>/`) and guide reference instead of generating fake geometry.
+2. **One-Page Asset Integration Guide**:
+   - Created `ASSET_INTEGRATION_GUIDE.md` detailing exact recommended free models (Kenney, Sketchfab CC-BY, CGTrader) for all 6 vehicles (Car, Truck, Tractor, JCB, Excavator, Harvester).
+   - Documented exact pivot point alignments (wheel hub centers, excavator cabin base, boom/stick joints, tipper rear hinge) and transform rigging bindings to controllers.
+   - Documented directory structure and PBR texture slots (`Assets/Textures/Vehicles/`, `Assets/Textures/Terrain/`, `Assets/Textures/Skybox/`).
+3. **PBR Lit Materials & Multi-Layer Terrain**:
+   - Implemented `HVW_VisualSystem.cs`: runtime factory generating calibrated `Universal Render Pipeline/Lit` (and Standard) PBR materials with Albedo (`_BaseMap`), Normal (`_BumpMap`), and Metallic/Smoothness parameters.
+   - Replaced flat plane ground with Unity `Terrain` configured with 4 PBR `TerrainLayers`: `Layer_Grass`, `Layer_Dirt`, `Layer_Asphalt`, and `Layer_Rock`, with dedicated slots for diffuse and normal textures.
+   - Added support slots for Terrain detail grass and Terrain Tree prototypes.
+4. **Calibrated Lighting & URP Post-Processing**:
+   - Eliminated yellow blowout exposure by replacing uncalibrated sun light with a balanced white-gold directional light (`Color(1.0f, 0.98f, 0.95f)` at intensity `1.0f`) with high-resolution soft shadows (strength `0.78f`, bias `0.05f`, normal bias `0.4f`).
+   - Configured natural balanced Trilight ambient illumination (sky `0.42f, 0.55f, 0.72f`, equator `0.38f, 0.42f, 0.48f`, ground `0.22f, 0.28f, 0.20f`).
+   - Generated a 3D grid of LightProbes (`LightProbeGroup`) across the operational vehicle zone (`-120m` to `+120m` on X/Z, `0.6m` to `6.0m` on Y).
+   - Implemented runtime URP Post-Processing `Volume` with ACES Tonemapping, low-intensity Bloom (`intensity: 0.20f`, `threshold: 1.05f`), and subtle contrast/saturation Color Adjustments.
+5. **Gameplay & Mobile UI Deconfliction**:
+   - Fixed UI overlap: resized vehicle selector toolbar buttons to `104 x 38 px` spaced across `x = 60px` to `672px`, repositioned center speedometer HUD to `x = 0`, width `260 x 64 px` (starting at `830px`), creating a 158px clear margin with zero collision.
+   - Added `CapsuleCollider` (radius `0.45f`, height `4.0f`) to tree trunks and colliders to props (crates, cones, dirt mounds).
+   - Ensured all 6 vehicles are selectable and drivable with automatic parking brake applied to inactive vehicles and smooth third-person camera chase tracking on switch.
+
+**New code:**
+```csharp
+// VehicleModelSlot.cs - Wheel pose sync & 3D model validation
+public void AutoBindPartsFromModel()
+{
+    if (modelSlot == null || modelSlot.childCount == 0) return;
+    Transform[] allChildren = modelSlot.GetComponentsInChildren<Transform>(true);
+    foreach (var child in allChildren)
+    {
+        string lower = child.name.ToLowerInvariant();
+        if (tipperBed == null && (lower.Contains("tipper") || lower.Contains("dumpbed"))) tipperBed = child;
+        if (boomArm == null && (lower.Contains("boom") || lower.Contains("arm1"))) boomArm = child;
+        if (stickArm == null && (lower.Contains("stick") || lower.Contains("dipper"))) stickArm = child;
+        if (bucket == null && lower.Contains("bucket")) bucket = child;
+        // Wheel mesh auto-binding
+        if (wheels != null && wheels.Length > 0 && lower.Contains("wheel"))
+        {
+            for (int i = 0; i < wheels.Length; i++)
+            {
+                if (wheels[i].mesh == null && lower.Contains($"wheel_{i}")) wheels[i].mesh = child;
+            }
+        }
+    }
+}
+
+// HVW_VisualSystem.cs - Post-Processing Volume Setup
+public void SetupPostProcessing()
+{
+    var volumeGo = new GameObject("GlobalPostProcessVolume");
+    var volume = volumeGo.AddComponent<Volume>();
+    volume.isGlobal = true;
+    var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+    var tonemapping = profile.Add<Tonemapping>(true);
+    tonemapping.mode.Override(TonemappingMode.ACES);
+    var bloom = profile.Add<Bloom>(true);
+    bloom.intensity.Override(0.20f);
+    bloom.threshold.Override(1.05f);
+    var colorAdj = profile.Add<ColorAdjustments>(true);
+    colorAdj.contrast.Override(10.0f);
+    colorAdj.saturation.Override(8.0f);
+    volume.profile = profile;
+}
+```
+
+**Why:**
+Previous code generated placeholder primitive geometry (cubes for vehicle chassis/cabins and cylinders for wheels) and used flat unlit colors with an overexposed yellow directional light (`Color(1f, 0.96f, 0.88f)` at `1.3f` intensity). Furthermore, the top vehicle selector toolbar overlapped into the speedometer HUD on mobile screens.
+
+*Previous code:*
+```csharp
+// Primitive body generation (HVW_WorldInitializer.cs)
+var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+body.name = "BodyVisual";
+// Overexposed yellow directional light
+dirLight.color = new Color(1f, 0.96f, 0.88f);
+dirLight.intensity = 1.3f;
+// Overlapping toolbar coordinates
+float xPos = 120f + (i * 155f); // Ended at 895px, colliding with 770px HUD
+```
+
+*Replacement:*
+Removed all primitive shape generation. Replaced with `VehicleModelSlot` featuring empty `Model` transforms for external FBX models, `GetWorldPose` wheel synchronization, PBR URP/Lit materials, 4-layer TerrainLayers, calibrated daylight with ACES tonemapping and low bloom, and deconflicted mobile UI layout.
+
+**Artifact Details:**
+- Output Path: `Builds/Android/HeavyVehiclesWorld_Production.apk` (and copied to Desktop: `C:\Users\Shivraj Deshmukh\Desktop\HeavyVehiclesWorld_Production.apk`)
+- File Size: 36,564,304 bytes (34.87 MB)
+- Target Architecture: ARM64 (IL2CPP)
+- Minimum API Level: Android 7.0 (API 24)
+- Target API Level: Android 14 (API 34)
+- Signature Scheme: APK Signature Scheme v2 (Signed with `HVW_Production.keystore`, CN=Shivraj Deshmukh)
+- SHA-256 Checksum: `17987CC9670F2C45D22CE159679E5175B45F69BFE726601DBD77C17E1EAFFD0B`
+
+**Related to:** Asset Integration, VehicleModelSlot, PBR Materials, TerrainLayers, Calibrated Lighting, Post-Processing, UI Layout Deconfliction, Mobile Touch HUD, Android Production Release
+---

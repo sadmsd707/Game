@@ -24,6 +24,10 @@ namespace HeavyVehiclesWorld.EditorTools
             {
                 initGo.AddComponent<HVW_WorldInitializer>();
             }
+            if (initGo.GetComponent<HVW_VisualSystem>() == null)
+            {
+                initGo.AddComponent<HVW_VisualSystem>();
+            }
 
             // Ensure Main Camera has Follow Camera
             var camGo = GameObject.Find("Main Camera");

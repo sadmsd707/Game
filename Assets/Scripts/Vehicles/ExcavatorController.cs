@@ -105,11 +105,13 @@ namespace HeavyVehiclesWorld.Vehicles
         private void ReadTrackInput()
         {
             var input = InputManager.Instance;
-            if (input == null) return;
+            float fwd = (input != null && Mathf.Abs(input.LeftJoystick.y) > 0.01f)
+                ? input.LeftJoystick.y
+                : (InputManagerProxy.Throttle - InputManagerProxy.Brake);
 
-            // Left joystick Y = forward / backward; X = turn (differential)
-            float fwd  = input.LeftJoystick.y;
-            float turn = input.LeftJoystick.x;
+            float turn = (input != null && Mathf.Abs(input.LeftJoystick.x) > 0.01f)
+                ? input.LeftJoystick.x
+                : InputManagerProxy.Steer;
 
             _leftTrackSpeed  = Mathf.Clamp(fwd + turn, -1f, 1f);
             _rightTrackSpeed = Mathf.Clamp(fwd - turn, -1f, 1f);

@@ -45,6 +45,14 @@ namespace HeavyVehiclesWorld.Systems
             }
             Instance = this;
 
+            // Initialize Master Visual & PBR System first
+            if (HVW_VisualSystem.Instance == null)
+            {
+                var visGo = GameObject.Find("HVW_VisualSystem");
+                if (visGo == null) visGo = new GameObject("HVW_VisualSystem");
+                visGo.AddComponent<HVW_VisualSystem>();
+            }
+
             BuildWorldEnvironment();
             SpawnAllVehicles();
             SetupFollowCamera();
@@ -74,50 +82,73 @@ namespace HeavyVehiclesWorld.Systems
                 var esGo = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
             }
 
-            // Directional Light
-            var lightGo = GameObject.Find("Directional Light");
-            if (lightGo == null)
+            // Calibrated Lighting & Skybox managed by HVW_VisualSystem
+            if (HVW_VisualSystem.Instance != null)
             {
-                lightGo = new GameObject("Directional Light");
-                var l = lightGo.AddComponent<Light>();
-                l.type = LightType.Directional;
+                HVW_VisualSystem.Instance.ApplyCalibratedLighting();
             }
-            var dirLight = lightGo.GetComponent<Light>();
-            dirLight.color = new Color(1f, 0.96f, 0.88f);
-            dirLight.intensity = 1.3f;
-            lightGo.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-
-            RenderSettings.ambientLight = new Color(0.45f, 0.52f, 0.6f);
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-
-            // Ground plane (Rich Grass Green)
-            var ground = GameObject.Find("Ground");
-            if (ground == null)
+            else
             {
-                ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-                ground.name = "Ground";
+                var lightGo = GameObject.Find("Directional Light");
+                if (lightGo == null)
+                {
+                    lightGo = new GameObject("Directional Light");
+                    var l = lightGo.AddComponent<Light>();
+                    l.type = LightType.Directional;
+                }
+                var dirLight = lightGo.GetComponent<Light>();
+                dirLight.color = new Color(1.0f, 0.98f, 0.95f);
+                dirLight.intensity = 1.0f;
+                dirLight.shadows = LightShadows.Soft;
+                dirLight.shadowStrength = 0.78f;
+                lightGo.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
             }
-            ground.transform.position = Vector3.zero;
-            ground.transform.localScale = new Vector3(80f, 1f, 80f); // 800m x 800m
-            var groundMat = new Material(Shader.Find("Standard"))
+
+            // Ground Terrain System (4 PBR TerrainLayers: Grass, Dirt, Asphalt, Rock)
+            var terrainGo = GameObject.Find("Terrain");
+            if (terrainGo == null)
             {
-                color = new Color(0.28f, 0.52f, 0.22f) // Grass Green
-            };
-            ground.GetComponent<Renderer>().sharedMaterial = groundMat;
+                var terrainData = new TerrainData();
+                terrainData.size = new Vector3(800f, 60f, 800f);
+                terrainData.heightmapResolution = 129;
+                terrainData.baseMapResolution = 512;
+                terrainData.SetDetailResolution(256, 16);
+
+                if (HVW_VisualSystem.Instance != null)
+                {
+                    terrainData.terrainLayers = new TerrainLayer[]
+                    {
+                        HVW_VisualSystem.Instance.grassLayer,
+                        HVW_VisualSystem.Instance.dirtLayer,
+                        HVW_VisualSystem.Instance.asphaltLayer,
+                        HVW_VisualSystem.Instance.rockLayer
+                    };
+                }
+
+                terrainGo = Terrain.CreateTerrainGameObject(terrainData);
+                terrainGo.name = "Terrain";
+                terrainGo.transform.position = new Vector3(-400f, 0f, -400f);
+
+                var terrainComp = terrainGo.GetComponent<Terrain>();
+                terrainComp.drawTreesAndFoliage = true;
+                terrainComp.treeDistance = 500f;
+                terrainComp.detailObjectDistance = 80f;
+            }
 
             // Road Circuit (Asphalt Loop)
             BuildRoadTrack();
 
-            // Props (Trees, Construction Zone, Farm Fields, Garage)
+            // Props (Trees with Colliders, Construction Zone, Farm Fields, Crates)
             BuildWorldProps();
         }
 
         private void BuildRoadTrack()
         {
             var roadRoot = new GameObject("RoadNetwork");
-            var asphaltMat = new Material(Shader.Find("Standard")) { color = new Color(0.18f, 0.18f, 0.20f) };
-            var stripeMat  = new Material(Shader.Find("Standard")) { color = new Color(0.95f, 0.85f, 0.15f) };
-            var curbMat    = new Material(Shader.Find("Standard")) { color = new Color(0.85f, 0.25f, 0.25f) };
+            var vis = HVW_VisualSystem.Instance;
+            var asphaltMat = (vis != null && vis.asphaltRoadPBR != null) ? vis.asphaltRoadPBR : new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard")) { color = new Color(0.18f, 0.18f, 0.20f) };
+            var stripeMat  = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard")) { color = new Color(0.95f, 0.85f, 0.15f) };
+            var curbMat    = (vis != null && vis.concreteCurbsPBR != null) ? vis.concreteCurbsPBR : new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard")) { color = new Color(0.85f, 0.25f, 0.25f) };
 
             // Main Straight Road (North-South) - 400m long, 14m wide
             CreateRoadSegment(roadRoot, "Road_MainStraight", new Vector3(0, 0.02f, 0), new Vector3(14f, 0.05f, 400f), asphaltMat, stripeMat, curbMat);
@@ -131,7 +162,7 @@ namespace HeavyVehiclesWorld.Systems
             constrGround.transform.SetParent(roadRoot.transform);
             constrGround.transform.position = new Vector3(35f, 0.03f, 35f);
             constrGround.transform.localScale = new Vector3(60f, 0.05f, 60f);
-            constrGround.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.55f, 0.38f, 0.22f) };
+            constrGround.GetComponent<Renderer>().sharedMaterial = (vis != null && vis.constructionPropsPBR != null) ? vis.constructionPropsPBR : new Material(Shader.Find("Standard")) { color = new Color(0.55f, 0.38f, 0.22f) };
 
             // Farm Field (Golden Wheat Yellow/Amber)
             var farmGround = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -175,12 +206,13 @@ namespace HeavyVehiclesWorld.Systems
         private void BuildWorldProps()
         {
             var propsRoot = new GameObject("WorldProps");
+            var vis = HVW_VisualSystem.Instance;
             var treeWoodMat   = new Material(Shader.Find("Standard")) { color = new Color(0.35f, 0.22f, 0.12f) };
             var treeLeavesMat = new Material(Shader.Find("Standard")) { color = new Color(0.18f, 0.45f, 0.15f) };
-            var coneMat       = new Material(Shader.Find("Standard")) { color = new Color(1f, 0.45f, 0.05f) };
+            var coneMat       = (vis != null && vis.constructionPropsPBR != null) ? vis.constructionPropsPBR : new Material(Shader.Find("Standard")) { color = new Color(1f, 0.45f, 0.05f) };
             var crateMat      = new Material(Shader.Find("Standard")) { color = new Color(0.6f, 0.45f, 0.25f) };
 
-            // Trees along road (40 trees)
+            // Trees along road with CapsuleCollider for physical collision
             for (int i = -8; i <= 8; i++)
             {
                 if (i == 0 || i == 1) continue;
@@ -188,7 +220,7 @@ namespace HeavyVehiclesWorld.Systems
                 CreateTree(propsRoot.transform, new Vector3( 12f, 0f, i * 22f), treeWoodMat, treeLeavesMat);
             }
 
-            // Construction cones & barriers around Construction Zone
+            // Construction cones around Construction Zone (with colliders)
             for (int i = 0; i < 6; i++)
             {
                 var cone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -196,9 +228,11 @@ namespace HeavyVehiclesWorld.Systems
                 cone.transform.position = new Vector3(12f + i * 4f, 0.4f, 18f);
                 cone.transform.localScale = new Vector3(0.5f, 0.8f, 0.5f);
                 cone.GetComponent<Renderer>().sharedMaterial = coneMat;
+                var col = cone.GetComponent<CapsuleCollider>();
+                if (col == null) col = cone.AddComponent<CapsuleCollider>();
             }
 
-            // Dirt Mounds for Excavator & JCB
+            // Dirt Mounds for Excavator & JCB (with colliders)
             for (int i = 0; i < 3; i++)
             {
                 var mound = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -206,9 +240,11 @@ namespace HeavyVehiclesWorld.Systems
                 mound.transform.position = new Vector3(28f + i * 8f, 0.8f, 40f + i * 5f);
                 mound.transform.localScale = new Vector3(7f, 3.5f, 7f);
                 mound.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.48f, 0.32f, 0.18f) };
+                var col = mound.GetComponent<SphereCollider>();
+                if (col == null) col = mound.AddComponent<SphereCollider>();
             }
 
-            // Freight crates for Truck
+            // Freight crates for Truck (with BoxCollider)
             for (int i = 0; i < 4; i++)
             {
                 var crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -216,6 +252,8 @@ namespace HeavyVehiclesWorld.Systems
                 crate.transform.position = new Vector3(-18f, 1f + (i % 2) * 2f, -10f + (i / 2) * 2.5f);
                 crate.transform.localScale = new Vector3(2f, 2f, 2f);
                 crate.GetComponent<Renderer>().sharedMaterial = crateMat;
+                var col = crate.GetComponent<BoxCollider>();
+                if (col == null) col = crate.AddComponent<BoxCollider>();
             }
         }
 
@@ -226,16 +264,27 @@ namespace HeavyVehiclesWorld.Systems
             tree.transform.position = pos;
 
             var trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            trunk.name = "Trunk";
             trunk.transform.SetParent(tree.transform, false);
             trunk.transform.localPosition = new Vector3(0, 2f, 0);
             trunk.transform.localScale = new Vector3(0.6f, 2f, 0.6f);
             trunk.GetComponent<Renderer>().sharedMaterial = woodMat;
 
+            // Ensure tree trunk has solid CapsuleCollider for vehicle collision
+            var capCol = trunk.GetComponent<CapsuleCollider>();
+            if (capCol == null) capCol = trunk.AddComponent<CapsuleCollider>();
+            capCol.radius = 0.45f;
+            capCol.height = 4.0f;
+            capCol.center = Vector3.zero;
+
             var leaves = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            leaves.name = "Leaves";
             leaves.transform.SetParent(tree.transform, false);
             leaves.transform.localPosition = new Vector3(0, 4.8f, 0);
             leaves.transform.localScale = new Vector3(3.5f, 3.5f, 3.5f);
             leaves.GetComponent<Renderer>().sharedMaterial = leavesMat;
+            var leafCol = leaves.GetComponent<Collider>();
+            if (leafCol) Destroy(leafCol);
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -320,38 +369,24 @@ namespace HeavyVehiclesWorld.Systems
             audio.loop = true;
             audio.spatialBlend = 0.5f;
 
-            // Visual Body Mesh (colored cube)
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            body.name = "BodyVisual";
-            body.transform.SetParent(root.transform, false);
-            body.transform.localPosition = new Vector3(0f, bodySize.y * 0.5f, 0f);
-            body.transform.localScale = bodySize;
-            body.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = bodyColor };
-            var bc = body.GetComponent<Collider>();
-            if (bc) Destroy(bc);
-
-            // Cabin / Roof (Dark tint)
-            var cabin = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cabin.name = "CabinVisual";
-            cabin.transform.SetParent(root.transform, false);
-            cabin.transform.localPosition = new Vector3(0f, bodySize.y * 0.95f, -bodySize.z * 0.1f);
-            cabin.transform.localScale = new Vector3(bodySize.x * 0.85f, bodySize.y * 0.55f, bodySize.z * 0.6f);
-            cabin.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.15f, 0.18f, 0.22f) };
-            var cc = cabin.GetComponent<Collider>();
-            if (cc) Destroy(cc);
-
-            // Main Chassis Collider
+            // Main Chassis Physics Collider
             var rootCol = root.AddComponent<BoxCollider>();
             rootCol.size = bodySize;
             rootCol.center = new Vector3(0f, bodySize.y * 0.5f, 0f);
+
+            // Empty "Model" child slot for imported 3D asset (FBX/OBJ/GLTF)
+            var modelGo = new GameObject("Model");
+            modelGo.transform.SetParent(root.transform, false);
+
+            var slot = root.AddComponent<VehicleModelSlot>();
+            slot.modelSlot = modelGo.transform;
+            slot.vehicleType = type;
 
             return root;
         }
 
         private void SetupVehiclePhysicsAndWheels(GameObject root, VehicleController ctrl, float wheelRadius, float mass)
         {
-            var wheelMat = new Material(Shader.Find("Standard")) { color = new Color(0.12f, 0.12f, 0.12f) };
-
             float halfW = 1.0f;
             float halfL = 1.6f;
 
@@ -364,7 +399,7 @@ namespace HeavyVehiclesWorld.Systems
             };
 
             var wcs = new WheelCollider[4];
-            var wMeshes = new Transform[4];
+            var bindings = new VehicleModelSlot.WheelBinding[4];
 
             for (int i = 0; i < 4; i++)
             {
@@ -384,18 +419,21 @@ namespace HeavyVehiclesWorld.Systems
 
                 wcs[i] = wc;
 
-                // Visual wheel mesh
-                var meshGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                meshGo.name = $"WheelMesh_{i}";
-                meshGo.transform.SetParent(root.transform, false);
-                meshGo.transform.localPosition = wheelOffsets[i];
-                meshGo.transform.localRotation = Quaternion.Euler(0, 0, 90);
-                meshGo.transform.localScale = new Vector3(wheelRadius * 2f, 0.35f, wheelRadius * 2f);
-                meshGo.GetComponent<Renderer>().sharedMaterial = wheelMat;
-                var col = meshGo.GetComponent<Collider>();
-                if (col) Destroy(col);
+                bindings[i] = new VehicleModelSlot.WheelBinding
+                {
+                    name = $"Wheel_{i}",
+                    collider = wc,
+                    mesh = null,
+                    isSteer = (i < 2),
+                    isDriven = (i >= 2)
+                };
+            }
 
-                wMeshes[i] = meshGo.transform;
+            var slot = root.GetComponent<VehicleModelSlot>();
+            if (slot != null)
+            {
+                slot.wheels = bindings;
+                slot.ValidateModelPresence();
             }
 
             ctrl.wheelColliders = wcs;
@@ -409,10 +447,6 @@ namespace HeavyVehiclesWorld.Systems
                 cc.frontRight = wcs[1];
                 cc.rearLeft = wcs[2];
                 cc.rearRight = wcs[3];
-                cc.frontLeftMesh = wMeshes[0];
-                cc.frontRightMesh = wMeshes[1];
-                cc.rearLeftMesh = wMeshes[2];
-                cc.rearRightMesh = wMeshes[3];
             }
         }
 
@@ -507,39 +541,39 @@ namespace HeavyVehiclesWorld.Systems
             for (int i = 0; i < vehicleDefs.Length; i++)
             {
                 int idx = i;
-                float xPos = 120f + (i * 155f);
+                float xPos = 60f + (i * 112f);
                 CreateClickButton(canvasGo, $"Btn_Select_{vehicleDefs[i].type}", vehicleDefs[i].label,
-                    new Vector2(0f, 1f), new Vector2(xPos, -60f), new Vector2(145f, 55f),
+                    new Vector2(0f, 1f), new Vector2(xPos, -35f), new Vector2(104f, 38f),
                     new Color(0.12f, 0.45f, 0.78f, 0.90f),
                     () => { SwitchToVehicleIndex(idx); });
             }
 
-            // Camera Toggle Button
+            // Camera Toggle Button (Top-Right)
             CreateClickButton(canvasGo, "Btn_CamView", "📷 VIEW",
-                new Vector2(1f, 1f), new Vector2(-250f, -60f), new Vector2(120f, 55f),
+                new Vector2(1f, 1f), new Vector2(-170f, -35f), new Vector2(100f, 38f),
                 new Color(0.25f, 0.25f, 0.30f, 0.90f),
                 () => { if (_followCamera) _followCamera.ToggleCameraMode(); });
 
-            // Reset Vehicle Button (Flip upright)
+            // Reset Vehicle Button (Top-Right)
             CreateClickButton(canvasGo, "Btn_ResetVeh", "🔄 RESET",
-                new Vector2(1f, 1f), new Vector2(-110f, -60f), new Vector2(120f, 55f),
+                new Vector2(1f, 1f), new Vector2(-60f, -35f), new Vector2(100f, 38f),
                 new Color(0.35f, 0.35f, 0.40f, 0.90f),
                 () => { ResetActiveVehicle(); });
 
-            // ── Top Center: Speedometer & Dashboard HUD ───────────────────────
+            // ── Top Center: Speedometer & Dashboard HUD (Deconflicted Layout) ───
             var hudPanel = new GameObject("HUD_Dashboard");
             hudPanel.transform.SetParent(canvasGo.transform, false);
             var hudRect = hudPanel.AddComponent<RectTransform>();
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0f, -70f);
-            hudRect.sizeDelta = new Vector2(380f, 90f);
+            hudRect.anchoredPosition = new Vector2(0f, -42f);
+            hudRect.sizeDelta = new Vector2(260f, 64f);
             var hudImg = hudPanel.AddComponent<Image>();
             hudImg.color = new Color(0.08f, 0.08f, 0.10f, 0.85f);
 
-            _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 32, TextAnchor.MiddleCenter, new Vector2(0f, 15f), new Vector2(360f, 40f), Color.white);
-            _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 18, TextAnchor.MiddleCenter, new Vector2(-90f, -22f), new Vector2(160f, 30f), new Color(0.4f, 0.85f, 1f));
-            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 18, TextAnchor.MiddleCenter, new Vector2(90f, -22f), new Vector2(180f, 30f), new Color(1f, 0.85f, 0.3f));
+            _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 24, TextAnchor.MiddleCenter, new Vector2(0f, 10f), new Vector2(240f, 30f), Color.white);
+            _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 14, TextAnchor.MiddleCenter, new Vector2(-65f, -16f), new Vector2(110f, 24f), new Color(0.4f, 0.85f, 1f));
+            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 14, TextAnchor.MiddleCenter, new Vector2(65f, -16f), new Vector2(120f, 24f), new Color(1f, 0.85f, 0.3f));
         }
 
         private Text CreateText(GameObject parent, string name, string text, int fontSize, TextAnchor alignment, Vector2 pos, Vector2 size, Color col)
@@ -693,15 +727,37 @@ namespace HeavyVehiclesWorld.Systems
         public void SelectVehicle(VehicleController vc)
         {
             if (vc == null) return;
+
+            // Safely park previously active vehicle
+            if (_activeVehicle != null && _activeVehicle != vc)
+            {
+                _activeVehicle.isOccupied = false;
+                _activeVehicle.throttleInput = 0f;
+                _activeVehicle.brakeInput = 0f;
+            }
+
             _activeVehicle = vc;
             _activeVehicle.engineRunning = true;
             _activeVehicle.isOccupied = true;
             _activeVehicle.currentGear = GearState.Drive;
+            _activeVehicle.throttleInput = 0f;
+            _activeVehicle.brakeInput = 0f;
 
             if (_followCamera != null)
             {
                 _followCamera.SetTarget(_activeVehicle.transform);
+                _followCamera.currentMode = HVW_FollowCamera.ViewMode.ThirdPerson;
             }
+
+            // Reset touch input state so new vehicle starts clean
+            _currentSteer = 0f;
+            _currentThrottle = 0f;
+            _currentBrake = 0f;
+            _steerLeftHeld = false;
+            _steerRightHeld = false;
+            _accelHeld = false;
+            _brakeHeld = false;
+            _handbrakeHeld = false;
 
             if (GameManager.Instance != null)
             {

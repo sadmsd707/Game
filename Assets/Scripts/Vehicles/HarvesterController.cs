@@ -121,9 +121,10 @@ namespace HeavyVehiclesWorld.Vehicles
             if (!engineRunning) return;
 
             var input = InputManager.Instance;
-            if (input == null) return;
+            float throttle = (input != null && Mathf.Abs(input.MoveY) > 0.01f)
+                ? input.MoveY
+                : (InputManagerProxy.Throttle - InputManagerProxy.Brake);
 
-            float throttle  = input.MoveY;
             float topSpeedMs = topSpeedKmh / 3.6f;
             float torque    = rb.linearVelocity.magnitude < topSpeedMs ? throttle * motorTorque : 0f;
 
@@ -137,9 +138,11 @@ namespace HeavyVehiclesWorld.Vehicles
             if (!engineRunning) return;
 
             var input = InputManager.Instance;
-            if (input == null) return;
+            float steerInput = (input != null && Mathf.Abs(input.MoveX) > 0.01f)
+                ? input.MoveX
+                : InputManagerProxy.Steer;
 
-            float steer = input.MoveX * maxSteerAngle;
+            float steer = steerInput * maxSteerAngle;
             wheelFL.steerAngle = steer;
             wheelFR.steerAngle = steer;
         }
