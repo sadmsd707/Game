@@ -1,23 +1,21 @@
 using UnityEngine;
 using HeavyVehiclesWorld.Controls;
+using HeavyVehiclesWorld.World;
 
 namespace HeavyVehiclesWorld.Vehicles
 {
     /// <summary>
     /// JCB Backhoe Loader controller.
-    /// Inherits VehicleController for engine, fuel, gear and event boilerplate.
-    ///
-    /// Drive layout  : 4 WheelColliders, optional 4WD toggle.
-    /// Front loader  : boom → arm → bucket chain driven by HydraulicArm components.
-    /// Rear backhoe  : swing (yaw) → boom → dipper → bucket chain.
-    /// Stabilizers   : two legs that must be deployed before rear backhoe is used.
+    /// Features: 4WD drivetrain, anti-roll suspension stability, articulated front loader
+    /// (boom & bucket), rear backhoe (swing, boom, dipper, bucket), deployable stabilizer legs,
+    /// procedural diesel-hydraulic engine audio, and terrain digging deformation.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     [RequireComponent(typeof(AudioSource))]
     public class JCBController : VehicleController
     {
-        // ── Drive ──────────────────────────────────────────────────────────
-        [Header("JCB – Drive")]
+        // ── Wheel Colliders & Meshes ───────────────────────────────────────
+        [Header("Wheel Colliders & Meshes")]
         [SerializeField] public WheelCollider wheelFL;
         [SerializeField] public WheelCollider wheelFR;
         [SerializeField] public WheelCollider wheelRL;
@@ -28,113 +26,156 @@ namespace HeavyVehiclesWorld.Vehicles
         [SerializeField] public Transform meshRL;
         [SerializeField] public Transform meshRR;
 
-        [SerializeField] private float motorTorque    = 5000f;
-        [SerializeField] private float maxSteerAngle  = 30f;
-        [SerializeField] private float topSpeedKmh    = 35f;
-        [SerializeField] private bool  fourWheelDrive = true;
+        // ── Suspension & Stability ─────────────────────────────────────────
+        [Header("Suspension & Stability")]
+        public float antiRollStiffness = 12000f;
+        public float downforceCoefficient = 3.0f;
+        public float steerSensitivity = 6.0f;
+        private float _currentSmoothedSteer;
 
-        // ── Front loader arm ───────────────────────────────────────────────
-        [Header("JCB – Front Loader")]
-        [SerializeField] public Transform loaderBoomTransform;      // JCBBoom
-        [SerializeField] public Transform loaderArmTransform;       // JCBArm
-        [SerializeField] public Transform loaderBucketTransform;    // JCBBucket
+        // ── Drive Tuning ───────────────────────────────────────────────────
+        [Header("Drive Tuning")]
+        [SerializeField] private float motorTorque     = 6500f;
+        [SerializeField] private float maxSteerAngle   = 32f;
+        [SerializeField] private float maxBrakeTorque  = 12000f;
+        [SerializeField] private float handBrakeTorque = 18000f;
+        [SerializeField] private float topSpeedKmh     = 38f;
+        [SerializeField] private bool  fourWheelDrive  = true;
+        public int currentGearIndex = 2; // 0 = R, 1 = N, 2 = D
 
-        [SerializeField] private HydraulicArm loaderBoom;
-        [SerializeField] private HydraulicArm loaderArm;
-        [SerializeField] private HydraulicArm loaderBucket;
+        // ── Front Loader Arm ───────────────────────────────────────────────
+        [Header("Front Loader")]
+        [SerializeField] public Transform loaderBoomTransform;      // Main loader boom pivot
+        [SerializeField] public Transform loaderBucketTransform;    // Loader bucket pivot
+        public float loaderBoomAngle;                               // Degrees: -10 (scoop) to 45 (high dump)
+        public float loaderBucketAngle;                             // Degrees: -30 (curl) to 45 (dump)
+        [SerializeField] private float loaderSpeed = 35f;           // Deg/sec
+        public bool isLoaderRaised;
 
-        [SerializeField] private float loaderRaiseSpeed  = 40f;  // deg/s used as joystick scale
-        [SerializeField] private float loaderTiltSpeed   = 50f;
-
-        // ── Rear backhoe arm ───────────────────────────────────────────────
-        [Header("JCB – Rear Backhoe")]
-        [SerializeField] public Transform backhoeSwingTransform;    // horizontal pivot
-        [SerializeField] public Transform backhoeBoomTransform;
-        [SerializeField] public Transform backhoeDipperTransform;   // stick
-        [SerializeField] public Transform backhoeBucketTransform;
-
-        [SerializeField] private HydraulicArm backhoeSwing;
-        [SerializeField] private HydraulicArm backhoeBoom;
-        [SerializeField] private HydraulicArm backhoeDipper;
-        [SerializeField] private HydraulicArm backhoeBucket;
-
-        [SerializeField] private float backhoeSwingSpeed  = 45f;
-        [SerializeField] private float backhoeDigSpeed    = 40f;
+        // ── Rear Backhoe Arm ───────────────────────────────────────────────
+        [Header("Rear Backhoe")]
+        [SerializeField] public Transform backhoeSwingTransform;    // Horizontal yaw pivot (-80 to +80)
+        [SerializeField] public Transform backhoeBoomTransform;     // Boom pitch (-25 to +55)
+        [SerializeField] public Transform backhoeDipperTransform;   // Stick/dipper (-40 to +40)
+        [SerializeField] public Transform backhoeBucketTransform;   // Backhoe bucket (-60 to +60)
+        [SerializeField] public Transform backhoeBucketTip;         // Tip for ground penetration
+        public float backhoeSwingAngle;
+        public float backhoeBoomAngle;
+        public float backhoeDipperAngle;
+        public float backhoeBucketAngle;
+        [SerializeField] private float backhoeSpeed = 40f;
 
         // ── Stabilizers ────────────────────────────────────────────────────
-        [Header("JCB – Stabilizers")]
-        [SerializeField] private Transform stabilizerLeft;
-        [SerializeField] private Transform stabilizerRight;
-
+        [Header("Stabilizers")]
+        [SerializeField] public Transform stabilizerLeft;
+        [SerializeField] public Transform stabilizerRight;
         [SerializeField] private Vector3 stabDownRotation = new Vector3(80f, 0f, 0f);
-        [SerializeField] private Vector3 stabUpRotation   = new Vector3(0f,  0f, 0f);
-        [SerializeField] private float   stabSpeed        = 60f;  // deg/s
-
+        [SerializeField] private Vector3 stabUpRotation   = new Vector3(0f, 0f, 0f);
+        [SerializeField] private float stabSpeed = 80f; // Deg/sec
         public bool StabilizersDown { get; private set; }
-
         private Quaternion _stabLeftTarget;
         private Quaternion _stabRightTarget;
 
-        // ── Engine audio ───────────────────────────────────────────────────
-        [Header("Audio")]
-        [SerializeField] private float engineIdlePitch = 0.6f;
-        [SerializeField] private float engineMaxPitch  = 1.4f;
+        // ── Soil Payload & Digging ─────────────────────────────────────────
+        [Header("Soil Payload & Digging")]
+        [Range(0f, 1f)] public float soilPayload;
+        public TerrainDeformer terrainDeformer;
+        private bool _isPerformingDigCycle;
+        private float _digCycleTimer;
 
         // ── Lifecycle ──────────────────────────────────────────────────────
         protected override void Start()
         {
             base.Start();
             vehicleType = VehicleType.JCB;
+            maxRPM = 2800f;
+            rb.mass = 7500f;
+            rb.centerOfMass = new Vector3(0f, -0.4f, 0.1f);
+
             _stabLeftTarget  = Quaternion.Euler(stabUpRotation);
             _stabRightTarget = Quaternion.Euler(stabUpRotation);
+
+            ConfigureWheelFriction(wheelFL);
+            ConfigureWheelFriction(wheelFR);
+            ConfigureWheelFriction(wheelRL);
+            ConfigureWheelFriction(wheelRR);
+
+            if (terrainDeformer == null)
+                terrainDeformer = FindObjectOfType<TerrainDeformer>();
+        }
+
+        private void FixedUpdate()
+        {
+            if (!engineRunning) return;
+
+            ApplyDriving();
+            ApplySteering();
+            ApplyAntiRoll(wheelFL, wheelFR);
+            ApplyAntiRoll(wheelRL, wheelRR);
+            ApplyAerodynamicDownforce();
+            SyncWheelMeshes();
+            UpdateStabilizers();
+            UpdateArticulatedArms();
+            ConsumeFuel();
         }
 
         protected override void Update()
         {
             base.Update();
-            if (!isOccupied || !engineRunning) return;
-
-            HandleDrive();
-            HandleFrontLoader();
-            HandleBackhoe();
-            HandleStabilizers();
-            SyncWheelMeshes();
+            UpdateEngineSound();
+            HandleManualInputs();
         }
 
         // ── Drive ──────────────────────────────────────────────────────────
         public override void ApplyDriving()
         {
-            if (!engineRunning || StabilizersDown) return;
-
-            // Drive only while stabilizers are UP
-            var input = InputManager.Instance;
-            float throttle = (input != null && Mathf.Abs(input.MoveY) > 0.01f)
-                ? input.MoveY
-                : (InputManagerProxy.Throttle - InputManagerProxy.Brake);
-
-            float topSpeedMs = topSpeedKmh / 3.6f;
-
-            float torque = 0f;
-            if (Mathf.Abs(rb.linearVelocity.magnitude) < topSpeedMs)
-                torque = throttle * motorTorque;
-
-            if (Mathf.Abs(throttle) > 0.05f)
+            // If stabilizers are deployed, wheels are firmly locked
+            if (StabilizersDown)
             {
-                if (wheelRL != null) { wheelRL.brakeTorque = 0f; wheelRL.motorTorque = torque; }
-                if (wheelRR != null) { wheelRR.brakeTorque = 0f; wheelRR.motorTorque = torque; }
-                if (fourWheelDrive)
-                {
-                    if (wheelFL != null) { wheelFL.brakeTorque = 0f; wheelFL.motorTorque = torque * 0.7f; }
-                    if (wheelFR != null) { wheelFR.brakeTorque = 0f; wheelFR.motorTorque = torque * 0.7f; }
-                }
+                WheelPhysicsHelper.ApplyBrakeTorque(new[] { wheelFL, wheelFR, wheelRL, wheelRR }, maxBrakeTorque);
+                WheelPhysicsHelper.ApplyMotorTorque(new[] { wheelFL, wheelFR, wheelRL, wheelRR }, 0f);
+                currentSpeed = 0f;
+                return;
+            }
+
+            float rawThrottle = InputManagerProxy.Throttle;
+            float rawBrake    = InputManagerProxy.Brake;
+
+            // Seamless auto-reverse when stopped
+            if (currentSpeed < 1.5f && rawBrake > 0.1f && rawThrottle < 0.05f)
+            {
+                currentGearIndex = 0; // Reverse
+            }
+            else if (rawThrottle > 0.1f && currentGearIndex == 0)
+            {
+                currentGearIndex = 2; // Forward
+            }
+
+            float throttle   = (currentGearIndex == 0) ? rawBrake : rawThrottle;
+            float brakeInput = (currentGearIndex == 0) ? rawThrottle : rawBrake;
+
+            float speedRatio = Mathf.Clamp01(rb.linearVelocity.magnitude / (topSpeedKmh / 3.6f));
+            float appliedTorque = (currentGearIndex == 1) ? 0f : throttle * motorTorque * (1f - speedRatio * 0.4f);
+
+            if (fourWheelDrive)
+            {
+                WheelPhysicsHelper.ApplyMotorTorque(new[] { wheelRL, wheelRR }, appliedTorque * 0.6f);
+                WheelPhysicsHelper.ApplyMotorTorque(new[] { wheelFL, wheelFR }, appliedTorque * 0.4f);
             }
             else
             {
-                float brakeT = 2500f;
-                if (wheelRL != null) { wheelRL.motorTorque = 0f; wheelRL.brakeTorque = brakeT; }
-                if (wheelRR != null) { wheelRR.motorTorque = 0f; wheelRR.brakeTorque = brakeT; }
-                if (wheelFL != null) { wheelFL.motorTorque = 0f; wheelFL.brakeTorque = brakeT; }
-                if (wheelFR != null) { wheelFR.motorTorque = 0f; wheelFR.brakeTorque = brakeT; }
+                WheelPhysicsHelper.ApplyMotorTorque(new[] { wheelRL, wheelRR }, appliedTorque);
+                WheelPhysicsHelper.ApplyMotorTorque(new[] { wheelFL, wheelFR }, 0f);
+            }
+
+            // Service brakes
+            WheelPhysicsHelper.ApplyBrakeTorque(new[] { wheelFL, wheelFR, wheelRL, wheelRR }, brakeInput * maxBrakeTorque);
+
+            // Handbrake (rear wheels)
+            if (InputManagerProxy.HandBrake > 0.5f)
+            {
+                if (wheelRL != null) wheelRL.brakeTorque = handBrakeTorque;
+                if (wheelRR != null) wheelRR.brakeTorque = handBrakeTorque;
             }
 
             currentSpeed = rb.linearVelocity.magnitude * 3.6f;
@@ -142,112 +183,293 @@ namespace HeavyVehiclesWorld.Vehicles
 
         public override void ApplySteering()
         {
-            if (!engineRunning || StabilizersDown) return;
+            if (StabilizersDown) return;
 
-            var input = InputManager.Instance;
-            float steerInput = (input != null && Mathf.Abs(input.MoveX) > 0.01f)
-                ? input.MoveX
-                : InputManagerProxy.Steer;
+            float targetSteer = InputManagerProxy.Steer;
+            _currentSmoothedSteer = Mathf.Lerp(_currentSmoothedSteer, targetSteer, Time.fixedDeltaTime * steerSensitivity);
 
-            float steer = steerInput * maxSteerAngle;
-            wheelFL.steerAngle = steer;
-            wheelFR.steerAngle = steer;
+            float speedKmh = rb != null ? rb.linearVelocity.magnitude * 3.6f : 0f;
+            float speedFactor = Mathf.Clamp01(speedKmh / 35f);
+            float effectiveSteerAngle = Mathf.Lerp(maxSteerAngle, 16f, speedFactor);
+
+            if (wheelFL != null) wheelFL.steerAngle = _currentSmoothedSteer * effectiveSteerAngle;
+            if (wheelFR != null) wheelFR.steerAngle = _currentSmoothedSteer * effectiveSteerAngle;
         }
 
-        // ── Loader ─────────────────────────────────────────────────────────
-        private void HandleFrontLoader()
+        public void ApplyAntiRoll(WheelCollider left, WheelCollider right)
         {
-            var input = InputManager.Instance;
-            if (input == null) return;
+            if (left == null || right == null || rb == null) return;
 
-            Vector2 lj = input.LeftJoystick;
+            float travelL = 1.0f;
+            float travelR = 1.0f;
 
-            // Y axis: raise / lower boom
-            if (loaderBoom != null)
-                loaderBoom.AdjustTargetAngle(-lj.y * loaderRaiseSpeed * Time.deltaTime);
+            bool groundedL = left.GetGroundHit(out WheelHit hitL);
+            if (groundedL)
+                travelL = (-left.transform.InverseTransformPoint(hitL.point).y - left.radius) / left.suspensionDistance;
 
-            // X axis: tilt bucket
-            if (loaderBucket != null)
-                loaderBucket.AdjustTargetAngle(lj.x * loaderTiltSpeed * Time.deltaTime);
+            bool groundedR = right.GetGroundHit(out WheelHit hitR);
+            if (groundedR)
+                travelR = (-right.transform.InverseTransformPoint(hitR.point).y - right.radius) / right.suspensionDistance;
+
+            float antiRollForce = (travelL - travelR) * antiRollStiffness;
+
+            if (groundedL)
+                rb.AddForceAtPosition(left.transform.up * -antiRollForce, left.transform.position);
+            if (groundedR)
+                rb.AddForceAtPosition(right.transform.up * antiRollForce, right.transform.position);
         }
 
-        // ── Backhoe ────────────────────────────────────────────────────────
-        private void HandleBackhoe()
+        public void ApplyAerodynamicDownforce()
         {
-            var input = InputManager.Instance;
-            if (input == null) return;
-
-            Vector2 rj = input.RightJoystick;
-
-            // Right joystick X: swing left/right
-            if (backhoeSwing != null)
-                backhoeSwing.AdjustTargetAngle(rj.x * backhoeSwingSpeed * Time.deltaTime);
-
-            // Right joystick Y: dipper (stick) in/out
-            if (backhoeDipper != null)
-                backhoeDipper.AdjustTargetAngle(-rj.y * backhoeDigSpeed * Time.deltaTime);
-
-            // Additional controls would come from extra UI buttons (bucket curl, boom) —
-            // accessed via InputManager extended axes if wired.
+            if (rb == null) return;
+            rb.AddForce(-transform.up * downforceCoefficient * rb.linearVelocity.sqrMagnitude);
         }
 
-        // ── Stabilizers ────────────────────────────────────────────────────
+        private void ConfigureWheelFriction(WheelCollider wc)
+        {
+            if (wc == null) return;
 
-        public void LowerStabilizers()
+            WheelFrictionCurve fwd = wc.forwardFriction;
+            fwd.extremumSlip = 0.40f;
+            fwd.extremumValue = 1.0f;
+            fwd.asymptoteSlip = 0.80f;
+            fwd.asymptoteValue = 0.70f;
+            fwd.stiffness = 1.5f;
+            wc.forwardFriction = fwd;
+
+            WheelFrictionCurve side = wc.sidewaysFriction;
+            side.extremumSlip = 0.35f;
+            side.extremumValue = 1.0f;
+            side.asymptoteSlip = 0.65f;
+            side.asymptoteValue = 0.80f;
+            side.stiffness = 1.6f;
+            wc.sidewaysFriction = side;
+        }
+
+        // ── Front Loader API ───────────────────────────────────────────────
+        public void ToggleFrontLoader()
+        {
+            isLoaderRaised = !isLoaderRaised;
+        }
+
+        public void SetLoaderBoomAngle(float angle)
+        {
+            loaderBoomAngle = Mathf.Clamp(angle, -10f, 45f);
+        }
+
+        public void SetLoaderBucketAngle(float angle)
+        {
+            loaderBucketAngle = Mathf.Clamp(angle, -35f, 45f);
+        }
+
+        // ── Rear Backhoe & Digging API ─────────────────────────────────────
+        public void SetBackhoeAngles(float swing, float boom, float dipper, float bucket)
+        {
+            backhoeSwingAngle  = Mathf.Clamp(swing, -80f, 80f);
+            backhoeBoomAngle   = Mathf.Clamp(boom, -25f, 55f);
+            backhoeDipperAngle = Mathf.Clamp(dipper, -40f, 40f);
+            backhoeBucketAngle = Mathf.Clamp(bucket, -60f, 60f);
+        }
+
+        public void TriggerDigStroke()
+        {
+            _isPerformingDigCycle = true;
+            _digCycleTimer = 0f;
+            DeployStabilizers();
+        }
+
+        public void DigAtGround()
+        {
+            Vector3 digPos = transform.position - transform.forward * 3.5f + Vector3.up * 0.1f;
+            if (backhoeBucketTip != null) digPos = backhoeBucketTip.position;
+
+            if (terrainDeformer != null)
+            {
+                terrainDeformer.DigAt(digPos, 1.2f, 0.4f);
+            }
+            soilPayload = Mathf.Clamp01(soilPayload + 0.35f);
+            Debug.Log($"[JCBController] DigAtGround performed at {digPos}. Soil payload: {soilPayload:P0}");
+        }
+
+        // ── Stabilizers API ────────────────────────────────────────────────
+        public void DeployStabilizers()
         {
             StabilizersDown  = true;
             _stabLeftTarget  = Quaternion.Euler(stabDownRotation);
             _stabRightTarget = Quaternion.Euler(stabDownRotation);
         }
 
-        public void RaiseStabilizers()
+        public void LowerStabilizers() => DeployStabilizers();
+
+        public void RetractStabilizers()
         {
             StabilizersDown  = false;
             _stabLeftTarget  = Quaternion.Euler(stabUpRotation);
             _stabRightTarget = Quaternion.Euler(stabUpRotation);
         }
 
-        private void HandleStabilizers()
-        {
-            if (stabilizerLeft != null)
-                stabilizerLeft.localRotation  = Quaternion.RotateTowards(
-                    stabilizerLeft.localRotation,  _stabLeftTarget,  stabSpeed * Time.deltaTime);
+        public void RaiseStabilizers() => RetractStabilizers();
 
-            if (stabilizerRight != null)
-                stabilizerRight.localRotation = Quaternion.RotateTowards(
-                    stabilizerRight.localRotation, _stabRightTarget, stabSpeed * Time.deltaTime);
+        public void ToggleStabilizers()
+        {
+            if (StabilizersDown) RetractStabilizers();
+            else DeployStabilizers();
         }
 
-        // ── Engine sound ───────────────────────────────────────────────────
+        public void UpdateStabilizers()
+        {
+            if (stabilizerLeft != null)
+                stabilizerLeft.localRotation = Quaternion.RotateTowards(stabilizerLeft.localRotation, _stabLeftTarget, stabSpeed * Time.fixedDeltaTime);
+
+            if (stabilizerRight != null)
+                stabilizerRight.localRotation = Quaternion.RotateTowards(stabilizerRight.localRotation, _stabRightTarget, stabSpeed * Time.fixedDeltaTime);
+        }
+
+        // ── Articulated Arms Update ────────────────────────────────────────
+        public void UpdateArticulatedArms()
+        {
+            // Front Loader target interpolation
+            float targetBoom = isLoaderRaised ? 35f : -5f;
+            float targetBucket = isLoaderRaised ? 25f : -15f;
+            loaderBoomAngle = Mathf.MoveTowards(loaderBoomAngle, targetBoom, loaderSpeed * Time.fixedDeltaTime);
+            loaderBucketAngle = Mathf.MoveTowards(loaderBucketAngle, targetBucket, loaderSpeed * Time.fixedDeltaTime);
+
+            if (loaderBoomTransform != null)
+                loaderBoomTransform.localRotation = Quaternion.Euler(loaderBoomAngle, 0f, 0f);
+            if (loaderBucketTransform != null)
+                loaderBucketTransform.localRotation = Quaternion.Euler(loaderBucketAngle, 0f, 0f);
+
+            // Automated Dig Cycle animation
+            if (_isPerformingDigCycle)
+            {
+                _digCycleTimer += Time.fixedDeltaTime;
+                if (_digCycleTimer < 1.0f)
+                {
+                    // Phase 1: Reach down into ground
+                    backhoeBoomAngle = Mathf.MoveTowards(backhoeBoomAngle, 35f, backhoeSpeed * Time.fixedDeltaTime);
+                    backhoeDipperAngle = Mathf.MoveTowards(backhoeDipperAngle, 25f, backhoeSpeed * Time.fixedDeltaTime);
+                    backhoeBucketAngle = Mathf.MoveTowards(backhoeBucketAngle, -40f, backhoeSpeed * Time.fixedDeltaTime);
+                }
+                else if (_digCycleTimer < 2.0f)
+                {
+                    // Phase 2: Curl bucket and scoop soil
+                    backhoeBucketAngle = Mathf.MoveTowards(backhoeBucketAngle, 45f, backhoeSpeed * 1.5f * Time.fixedDeltaTime);
+                    backhoeDipperAngle = Mathf.MoveTowards(backhoeDipperAngle, -15f, backhoeSpeed * Time.fixedDeltaTime);
+                }
+                else if (_digCycleTimer < 3.0f)
+                {
+                    // Phase 3: Lift boom and dig terrain
+                    backhoeBoomAngle = Mathf.MoveTowards(backhoeBoomAngle, -15f, backhoeSpeed * Time.fixedDeltaTime);
+                    if (_digCycleTimer > 2.2f && soilPayload < 0.2f)
+                    {
+                        DigAtGround();
+                    }
+                }
+                else
+                {
+                    _isPerformingDigCycle = false;
+                }
+            }
+
+            // Apply Backhoe rotations
+            if (backhoeSwingTransform != null)
+                backhoeSwingTransform.localRotation = Quaternion.Euler(0f, backhoeSwingAngle, 0f);
+            if (backhoeBoomTransform != null)
+                backhoeBoomTransform.localRotation = Quaternion.Euler(backhoeBoomAngle, 0f, 0f);
+            if (backhoeDipperTransform != null)
+                backhoeDipperTransform.localRotation = Quaternion.Euler(backhoeDipperAngle, 0f, 0f);
+            if (backhoeBucketTransform != null)
+                backhoeBucketTransform.localRotation = Quaternion.Euler(backhoeBucketAngle, 0f, 0f);
+        }
+
+        private void HandleManualInputs()
+        {
+            var input = InputManager.Instance;
+            if (input == null) return;
+
+            // Joystick manual adjustments when stationary
+            if (Mathf.Abs(input.LeftJoystick.y) > 0.1f)
+            {
+                loaderBoomAngle += input.LeftJoystick.y * loaderSpeed * Time.deltaTime;
+                loaderBoomAngle = Mathf.Clamp(loaderBoomAngle, -10f, 45f);
+            }
+            if (Mathf.Abs(input.LeftJoystick.x) > 0.1f)
+            {
+                loaderBucketAngle += input.LeftJoystick.x * loaderSpeed * Time.deltaTime;
+                loaderBucketAngle = Mathf.Clamp(loaderBucketAngle, -35f, 45f);
+            }
+        }
+
+        // ── Engine Sound ───────────────────────────────────────────────────
         public override void UpdateEngineSound()
         {
             if (engineAudioSource == null) return;
-            if (!engineAudioSource.isPlaying) engineAudioSource.Play();
+            if (engineAudioSource.clip == null)
+            {
+                engineAudioSource.clip = CreateProceduralJCBDieselClip();
+            }
+
+            if (!engineAudioSource.isPlaying)
+            {
+                engineAudioSource.loop = true;
+                engineAudioSource.Play();
+            }
 
             float load = Mathf.Clamp01(Mathf.Abs(currentSpeed) / topSpeedKmh);
-            engineAudioSource.pitch = Mathf.Lerp(engineIdlePitch, engineMaxPitch, load);
-            engineRPM = Mathf.Lerp(800f, 4000f, load);
+            float rpmRatio = Mathf.Lerp(0.2f, 1.0f, load + (_isPerformingDigCycle ? 0.35f : 0f));
+            engineAudioSource.pitch = Mathf.Lerp(0.70f, 1.80f, rpmRatio);
+            engineAudioSource.volume = Mathf.Lerp(0.40f, 0.88f, 0.4f + 0.6f * Mathf.Abs(InputManagerProxy.Throttle));
         }
 
-        public override string GetVehicleInfo()
+        public static AudioClip CreateProceduralJCBDieselClip()
         {
-            return $"JCB Backhoe | Speed: {currentSpeed:F1} km/h | " +
-                   $"Fuel: {fuelLevel:F0}% | Stabs: {(StabilizersDown ? "DOWN" : "UP")}";
+            int sampleRate = 22050;
+            float duration = 0.5f;
+            int totalSamples = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[totalSamples];
+
+            float fundamentalFreq = 30f; // ~30 Hz 4-cylinder turbocharged diesel idle
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float s1 = Mathf.Sin(2f * Mathf.PI * fundamentalFreq * t);
+                float s2 = 0.55f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 2f * t);
+                float s3 = 0.30f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 3f * t);
+                float pumpWhine = 0.08f * Mathf.Sin(2f * Mathf.PI * 440f * t); // Hydraulic pump hum
+                float noise = (UnityEngine.Random.value * 2f - 1f) * 0.1f;
+                samples[i] = Mathf.Clamp((s1 + s2 + s3 + pumpWhine + noise) * 0.36f, -1f, 1f);
+            }
+
+            var clip = AudioClip.Create("Synthesized_JCB_Diesel", totalSamples, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
-        // ── Wheel mesh sync ────────────────────────────────────────────────
+        // ── Wheel Mesh Sync ────────────────────────────────────────────────
         private void SyncWheelMeshes()
         {
-            UpdateWheelMeshes(wheelFL, meshFL);
-            UpdateWheelMeshes(wheelFR, meshFR);
-            UpdateWheelMeshes(wheelRL, meshRL);
-            UpdateWheelMeshes(wheelRR, meshRR);
+            WheelPhysicsHelper.UpdateWheelPose(wheelFL, meshFL);
+            WheelPhysicsHelper.UpdateWheelPose(wheelFR, meshFR);
+            WheelPhysicsHelper.UpdateWheelPose(wheelRL, meshRL);
+            WheelPhysicsHelper.UpdateWheelPose(wheelRR, meshRR);
         }
 
-        private void HandleDrive()
+        private void OnCollisionEnter(Collision collision)
         {
-            ApplyDriving();
-            ApplySteering();
+            float impactForce = collision.relativeVelocity.magnitude;
+            if (impactForce > 3.5f)
+            {
+                float dmg = (impactForce - 3.5f) * 1.5f;
+                damageLevel = Mathf.Clamp(damageLevel + dmg, 0f, 100f);
+            }
         }
+
+        private void ConsumeFuel()
+        {
+            if (fuelLevel > 0f)
+                fuelLevel -= Time.fixedDeltaTime * 0.012f * Mathf.Abs(InputManagerProxy.Throttle);
+        }
+
+        public override string GetVehicleInfo() => "JCB Backhoe";
     }
 }

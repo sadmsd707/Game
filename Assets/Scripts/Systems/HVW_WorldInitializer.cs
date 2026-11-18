@@ -27,6 +27,8 @@ namespace HeavyVehiclesWorld.Systems
         private Text _vehicleNameText;
         private GameObject _actionButtonGo;
         private Text _actionButtonLabel;
+        private GameObject _actionButtonGo2;
+        private Text _actionButtonLabel2;
 
         private bool _steerLeftHeld;
         private bool _steerRightHeld;
@@ -135,6 +137,8 @@ namespace HeavyVehiclesWorld.Systems
                 terrainComp.drawTreesAndFoliage = true;
                 terrainComp.treeDistance = 500f;
                 terrainComp.detailObjectDistance = 80f;
+                if (terrainGo.GetComponent<HeavyVehiclesWorld.World.TerrainDeformer>() == null)
+                    terrainGo.AddComponent<HeavyVehiclesWorld.World.TerrainDeformer>();
             }
 
             // Road Circuit (Asphalt Loop)
@@ -584,28 +588,70 @@ namespace HeavyVehiclesWorld.Systems
                 case VehicleType.JCB:
                     CreateBox("JCB_Cab", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.62f, 0f), new Vector3(bodySize.x * 0.85f, bodySize.y * 0.62f, bodySize.z * 0.65f), bodyMat);
 
-                    // Front Loader
-                    var loaderPivot = new GameObject("Loader_Pivot");
-                    loaderPivot.transform.SetParent(placeholderGo.transform, false);
-                    loaderPivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.45f, bodySize.z * 0.35f);
-                    CreateBox("Loader_Arm", loaderPivot.transform, new Vector3(0f, 0f, 0.65f), new Vector3(bodySize.x * 0.8f, 0.2f, 1.3f), bodyMat);
-                    CreateBox("Loader_Bucket", loaderPivot.transform, new Vector3(0f, -0.1f, 1.35f), new Vector3(bodySize.x * 1.05f, 0.55f, 0.65f), steelMat);
-                    slot.frontLoaderBoom = loaderPivot.transform;
-                    slot.frontLoaderBucket = loaderPivot.transform;
+                    // Front Loader Boom & Bucket
+                    var loaderBoomPivot = new GameObject("Loader_Boom_Pivot");
+                    loaderBoomPivot.transform.SetParent(placeholderGo.transform, false);
+                    loaderBoomPivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.45f, bodySize.z * 0.35f);
+                    CreateBox("Loader_Arm", loaderBoomPivot.transform, new Vector3(0f, 0f, 0.65f), new Vector3(bodySize.x * 0.8f, 0.2f, 1.3f), bodyMat);
 
-                    // Rear Backhoe
-                    var backhoePivot = new GameObject("Backhoe_Pivot");
-                    backhoePivot.transform.SetParent(placeholderGo.transform, false);
-                    backhoePivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.5f, -bodySize.z * 0.42f);
-                    CreateBox("Backhoe_Boom", backhoePivot.transform, new Vector3(0f, 0.5f, -0.8f), new Vector3(0.35f, 0.35f, 1.6f), bodyMat);
-                    CreateBox("Backhoe_Bucket", backhoePivot.transform, new Vector3(0f, 0.1f, -1.7f), new Vector3(0.55f, 0.45f, 0.55f), steelMat);
-                    slot.boomArm = backhoePivot.transform;
-                    slot.stickArm = backhoePivot.transform;
-                    slot.bucket = backhoePivot.transform;
+                    var loaderBucketPivot = new GameObject("Loader_Bucket_Pivot");
+                    loaderBucketPivot.transform.SetParent(loaderBoomPivot.transform, false);
+                    loaderBucketPivot.transform.localPosition = new Vector3(0f, -0.05f, 1.3f);
+                    CreateBox("Loader_Bucket", loaderBucketPivot.transform, new Vector3(0f, 0f, 0.15f), new Vector3(bodySize.x * 1.05f, 0.55f, 0.65f), steelMat);
+
+                    slot.frontLoaderBoom = loaderBoomPivot.transform;
+                    slot.frontLoaderBucket = loaderBucketPivot.transform;
+
+                    // Rear Backhoe Swing, Boom, Dipper & Bucket
+                    var backhoeSwingPivot = new GameObject("Backhoe_Swing_Pivot");
+                    backhoeSwingPivot.transform.SetParent(placeholderGo.transform, false);
+                    backhoeSwingPivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.45f, -bodySize.z * 0.45f);
+
+                    var backhoeBoomPivot = new GameObject("Backhoe_Boom_Pivot");
+                    backhoeBoomPivot.transform.SetParent(backhoeSwingPivot.transform, false);
+                    backhoeBoomPivot.transform.localPosition = new Vector3(0f, 0.1f, 0f);
+                    CreateBox("Backhoe_Boom_Mesh", backhoeBoomPivot.transform, new Vector3(0f, 0.4f, -0.6f), new Vector3(0.35f, 0.35f, 1.3f), bodyMat);
+
+                    var backhoeDipperPivot = new GameObject("Backhoe_Dipper_Pivot");
+                    backhoeDipperPivot.transform.SetParent(backhoeBoomPivot.transform, false);
+                    backhoeDipperPivot.transform.localPosition = new Vector3(0f, 0.8f, -1.2f);
+                    CreateBox("Backhoe_Dipper_Mesh", backhoeDipperPivot.transform, new Vector3(0f, -0.3f, -0.4f), new Vector3(0.28f, 0.28f, 1.0f), bodyMat);
+
+                    var backhoeBucketPivot = new GameObject("Backhoe_Bucket_Pivot");
+                    backhoeBucketPivot.transform.SetParent(backhoeDipperPivot.transform, false);
+                    backhoeBucketPivot.transform.localPosition = new Vector3(0f, -0.7f, -0.8f);
+                    CreateBox("Backhoe_Bucket_Mesh", backhoeBucketPivot.transform, new Vector3(0f, -0.1f, 0.1f), new Vector3(0.55f, 0.45f, 0.55f), steelMat);
+
+                    var backhoeTip = new GameObject("Bucket_Tip");
+                    backhoeTip.transform.SetParent(backhoeBucketPivot.transform, false);
+                    backhoeTip.transform.localPosition = new Vector3(0f, -0.3f, 0.3f);
+
+                    slot.boomArm = backhoeBoomPivot.transform;
+                    slot.stickArm = backhoeDipperPivot.transform;
+                    slot.bucket = backhoeBucketPivot.transform;
+
+                    // Stabilizer Legs
+                    var stabL = new GameObject("Stabilizer_L");
+                    stabL.transform.SetParent(placeholderGo.transform, false);
+                    stabL.transform.localPosition = new Vector3(-bodySize.x * 0.48f, bodySize.y * 0.35f, -bodySize.z * 0.32f);
+                    CreateBox("Stab_L_Leg", stabL.transform, new Vector3(0f, -0.4f, 0f), new Vector3(0.18f, 0.8f, 0.18f), steelMat);
+
+                    var stabR = new GameObject("Stabilizer_R");
+                    stabR.transform.SetParent(placeholderGo.transform, false);
+                    stabR.transform.localPosition = new Vector3(bodySize.x * 0.48f, bodySize.y * 0.35f, -bodySize.z * 0.32f);
+                    CreateBox("Stab_R_Leg", stabR.transform, new Vector3(0f, -0.4f, 0f), new Vector3(0.18f, 0.8f, 0.18f), steelMat);
+
                     if (ctrl is JCBController jcb)
                     {
-                        jcb.loaderBoomTransform = loaderPivot.transform;
-                        jcb.backhoeBoomTransform = backhoePivot.transform;
+                        jcb.loaderBoomTransform = loaderBoomPivot.transform;
+                        jcb.loaderBucketTransform = loaderBucketPivot.transform;
+                        jcb.backhoeSwingTransform = backhoeSwingPivot.transform;
+                        jcb.backhoeBoomTransform = backhoeBoomPivot.transform;
+                        jcb.backhoeDipperTransform = backhoeDipperPivot.transform;
+                        jcb.backhoeBucketTransform = backhoeBucketPivot.transform;
+                        jcb.backhoeBucketTip = backhoeTip.transform;
+                        jcb.stabilizerLeft = stabL.transform;
+                        jcb.stabilizerRight = stabR.transform;
                     }
                     break;
 
@@ -837,12 +883,19 @@ namespace HeavyVehiclesWorld.Systems
                 () => { _handbrakeHeld = true; },
                 () => { _handbrakeHeld = false; });
 
-            // Vehicle Action Button (Dump Bed / Plough / Header)
+            // Vehicle Action Button 1 (Dump Bed / Loader / Plough / Header)
             _actionButtonGo = CreateClickButton(canvasGo, "Btn_VehicleAction", "ACTION",
                 new Vector2(1f, 0f), new Vector2(-130f, 290f), new Vector2(140f, 65f),
                 new Color(0.92f, 0.45f, 0.12f, 0.92f),
-                () => { TriggerVehicleAction(); });
+                () => { TriggerVehicleAction(1); });
             _actionButtonLabel = _actionButtonGo.GetComponentInChildren<Text>();
+
+            // Vehicle Action Button 2 (Digging / Slew / Auger)
+            _actionButtonGo2 = CreateClickButton(canvasGo, "Btn_VehicleAction2", "ACTION 2",
+                new Vector2(1f, 0f), new Vector2(-130f, 365f), new Vector2(140f, 65f),
+                new Color(0.15f, 0.65f, 0.95f, 0.92f),
+                () => { TriggerVehicleAction(2); });
+            _actionButtonLabel2 = _actionButtonGo2.GetComponentInChildren<Text>();
 
             // ── Top Toolbar: Vehicle Switcher ────────────────────────────────
             var vehicleDefs = new (string label, VehicleType type)[]
@@ -1086,7 +1139,7 @@ namespace HeavyVehiclesWorld.Systems
             UpdateActionUI();
         }
 
-        private void TriggerVehicleAction()
+        private void TriggerVehicleAction(int buttonIndex = 1)
         {
             if (_activeVehicle == null) return;
             if (_activeVehicle is TruckController tk)
@@ -1097,6 +1150,18 @@ namespace HeavyVehiclesWorld.Systems
             else if (_activeVehicle is TractorController tc)
             {
                 tc.ToggleHitch();
+                UpdateActionUI();
+            }
+            else if (_activeVehicle is JCBController jcb)
+            {
+                if (buttonIndex == 1)
+                {
+                    jcb.ToggleFrontLoader();
+                }
+                else
+                {
+                    jcb.TriggerDigStroke();
+                }
                 UpdateActionUI();
             }
             else if (_activeVehicle is HarvesterController hc)
@@ -1115,22 +1180,39 @@ namespace HeavyVehiclesWorld.Systems
                 _actionButtonGo.SetActive(true);
                 if (_actionButtonLabel != null)
                     _actionButtonLabel.text = tk.isDumping ? "🚛 LOWER\nBED" : "🚛 DUMP\nBED";
+                if (_actionButtonGo2 != null) _actionButtonGo2.SetActive(false);
             }
             else if (_activeVehicle is TractorController tc)
             {
                 _actionButtonGo.SetActive(true);
                 if (_actionButtonLabel != null)
                     _actionButtonLabel.text = (tc.hitchPosition < 0.5f) ? "🚜 RAISE\nPLOUGH" : "🚜 LOWER\nPLOUGH";
+                if (_actionButtonGo2 != null) _actionButtonGo2.SetActive(false);
+            }
+            else if (_activeVehicle is JCBController jcb)
+            {
+                _actionButtonGo.SetActive(true);
+                if (_actionButtonLabel != null)
+                    _actionButtonLabel.text = jcb.isLoaderRaised ? "🏗️ LOWER\nLOADER" : "🏗️ RAISE\nLOADER";
+
+                if (_actionButtonGo2 != null)
+                {
+                    _actionButtonGo2.SetActive(true);
+                    if (_actionButtonLabel2 != null)
+                        _actionButtonLabel2.text = "⛏️ DIG\nSTROKE";
+                }
             }
             else if (_activeVehicle is HarvesterController hc)
             {
                 _actionButtonGo.SetActive(true);
                 if (_actionButtonLabel != null)
                     _actionButtonLabel.text = hc.headerLowered ? "🌾 RAISE\nHEADER" : "🌾 LOWER\nHEADER";
+                if (_actionButtonGo2 != null) _actionButtonGo2.SetActive(false);
             }
             else
             {
                 _actionButtonGo.SetActive(false);
+                if (_actionButtonGo2 != null) _actionButtonGo2.SetActive(false);
             }
         }
 

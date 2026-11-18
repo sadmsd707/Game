@@ -914,3 +914,79 @@ Step 2 required perfecting the Truck (tipper bed works, payload dumps, heavy ant
 
 **Related to:** Step 2 Truck and Tractor, Tipper Bed Dumping, Cargo Payload, 3-Point Hitch, Working Plough Implement, Anti-Roll Suspension, Progressive Air Brakes, Procedural Diesel Audio, Mobile Action HUD
 ---
+
+
+### Change #32 | 2026-11-19 03:42
+**Files changed:**
+- Assets/Scripts/Vehicles/JCBController.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+
+**What changed:**
+- Perfected JCB Backhoe Loader physics, controls, dual mechanisms, and digging system (Step 3 - Part 1: JCB):
+  - 4WD drivetrain physics moved from `Update()` to `FixedUpdate()` with anti-roll sway bars (`antiRollStiffness = 12000f`) and aerodynamic downforce (`downforceCoefficient = 3.0f`) to eliminate tipping during sharp maneuvers.
+  - Off-road friction curves configured (`stiffness = 1.5f`) and center of mass balanced to `(0f, -0.4f, 0.1f)`.
+  - Service brakes upgraded to `12000f` max torque, handbrake to `18000f` Nm, and seamless auto-reverse engaged when holding brake from stop (`currentGearIndex = 0`).
+  - Deployable stabilizer legs (`stabilizerLeft`, `stabilizerRight`) with smooth rotation to 80° (deployed) and 0° (transport), enforcing drive inhibit (wheels locked with max brake torque while stabilizers are down).
+  - Articulated Front Loader: independent boom pivot (`loaderBoomTransform`, -10° to 45°) and bucket pivot (`loaderBucketTransform`, -35° to 45°) operated smoothly via `ToggleFrontLoader()`, `SetLoaderBoomAngle()`, and `SetLoaderBucketAngle()`.
+  - Articulated Rear Backhoe & Digging System:
+    - 4-axis articulated chain: swing yaw (`backhoeSwingTransform`, -80° to 80°), boom pitch (`backhoeBoomTransform`, -25° to 55°), dipper stick (`backhoeDipperTransform`, -40° to 40°), and bucket curl (`backhoeBucketTransform`, -60° to 60°) with `backhoeBucketTip`.
+    - Automated digging stroke cycle via `TriggerDigStroke()` and real-time terrain modification via `DigAtGround()` using `TerrainDeformer.DigAt()`, accumulating soil payload.
+  - Procedural JCB Turbo Diesel Audio: synthesized 4-cylinder engine rumble (~30 Hz) with hydraulic pump whine overlay (`CreateProceduralJCBDieselClip()`), dynamic RPM pitch scaling (0.70x–1.80x), and volume modulation.
+  - Added collision impact damage tracking in `OnCollisionEnter`.
+- Upgraded Mobile HUD & Visual Hierarchy:
+  - Added dual action buttons on HUD: Button 1 (`"🏗️ LOADER\nRAISE / DUMP"`) and Button 2 (`"⛏️ DIG\nSTROKE"`), providing instant 1-tap touch access for mobile gameplay.
+  - Attached `TerrainDeformer` to active terrain in `BuildWorldEnvironment()`.
+  - Rigged independent pivots for Front Loader boom/bucket, Rear Backhoe swing/boom/dipper/bucket/tip, and stabilizer legs in `HVW_WorldInitializer.cs`.
+- Expanded Play-Mode Recovery Test Suite:
+  - Added comprehensive verification block `STEP 3A: JCB ONLY PERFECTION VERIFICATION`.
+  - Tested 4WD acceleration, anti-roll stability (upright dot product: 1.00), service braking to complete stop (0.6 km/h), auto-reverse drive (0.84m), 18,000 Nm handbrake lock, stabilizer deployment with drive inhibit, front loader boom raising (35°) and bucket tilting (25°), rear backhoe articulated dig stroke and soil collection (35%), procedural turbo diesel audio synthesis, and camera framing at 8.43m.
+
+**New code:**
+```csharp
+// JCBController.cs - Articulated arms and digging stroke cycle
+public void UpdateArticulatedArms()
+{
+    float targetBoom = isLoaderRaised ? 35f : -5f;
+    float targetBucket = isLoaderRaised ? 25f : -15f;
+    loaderBoomAngle = Mathf.MoveTowards(loaderBoomAngle, targetBoom, loaderSpeed * Time.fixedDeltaTime);
+    loaderBucketAngle = Mathf.MoveTowards(loaderBucketAngle, targetBucket, loaderSpeed * Time.fixedDeltaTime);
+
+    if (loaderBoomTransform != null) loaderBoomTransform.localRotation = Quaternion.Euler(loaderBoomAngle, 0f, 0f);
+    if (loaderBucketTransform != null) loaderBucketTransform.localRotation = Quaternion.Euler(loaderBucketAngle, 0f, 0f);
+
+    if (_isPerformingDigCycle)
+    {
+        _digCycleTimer += Time.fixedDeltaTime;
+        if (_digCycleTimer < 1.0f) {
+            backhoeBoomAngle = Mathf.MoveTowards(backhoeBoomAngle, 35f, backhoeSpeed * Time.fixedDeltaTime);
+            backhoeDipperAngle = Mathf.MoveTowards(backhoeDipperAngle, 25f, backhoeSpeed * Time.fixedDeltaTime);
+            backhoeBucketAngle = Mathf.MoveTowards(backhoeBucketAngle, -40f, backhoeSpeed * Time.fixedDeltaTime);
+        } else if (_digCycleTimer < 2.0f) {
+            backhoeBucketAngle = Mathf.MoveTowards(backhoeBucketAngle, 45f, backhoeSpeed * 1.5f * Time.fixedDeltaTime);
+            backhoeDipperAngle = Mathf.MoveTowards(backhoeDipperAngle, -15f, backhoeSpeed * Time.fixedDeltaTime);
+        } else if (_digCycleTimer < 3.0f) {
+            backhoeBoomAngle = Mathf.MoveTowards(backhoeBoomAngle, -15f, backhoeSpeed * Time.fixedDeltaTime);
+            if (_digCycleTimer > 2.2f && soilPayload < 0.2f) DigAtGround();
+        } else {
+            _isPerformingDigCycle = false;
+        }
+    }
+}
+```
+
+**Why:**
+Step 3 requires perfecting heavy machinery one at a time, starting with the JCB Backhoe Loader: implementing stable 4WD physics, deployable stabilizers with drive inhibit, independent front loader boom/bucket articulation, rear backhoe digging motion that deforms the terrain and collects soil, procedural diesel audio synthesis, and dedicated mobile touch controls.
+
+*Previous code:*
+```csharp
+// JCBController previously handled physics inside Update() instead of FixedUpdate(),
+// had no anti-roll bars or aerodynamic downforce causing rollovers,
+// lacked automated auto-reverse and handbrake locking,
+// had no procedural engine audio fallback,
+// had incomplete front loader and backhoe transform hierarchy with unarticulated single pivots,
+// and had no on-screen touch buttons for mobile digging or loader operations.
+```
+
+**Related to:** Step 3 Heavy Machinery, JCB Backhoe Loader, Front Loader Boom Bucket, Rear Backhoe Digging, Terrain Deformation, Stabilizers Drive Inhibit, Anti-Roll Suspension, Procedural Turbo Diesel Audio, Dual Action Touch HUD
+---
