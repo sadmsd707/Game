@@ -99,35 +99,78 @@ namespace HeavyVehiclesWorld.Vehicles
 
         public override void ApplyDriving()
         {
+            if (_driveWheels == null || _driveWheels.Length == 0 || _driveWheels[0] == null)
+            {
+                _driveWheels = new[] { rearLeft, rearRight };
+                _steerWheels = new[] { frontLeft, frontRight };
+                _allWheels   = new[] { frontLeft, frontRight, rearLeft, rearRight };
+            }
+
             float throttle = InputManagerProxy.Throttle;
             _brakeInput     = InputManagerProxy.Brake;
             _handBrakeInput = InputManagerProxy.HandBrake;
 
-            float ratio      = gearRatios[currentGearIndex];
-            float wheelRPM   = WheelPhysicsHelper.GetWheelRPM(rearLeft);
-            engineRPM        = Mathf.Clamp(
+            if (rb != null)
+                currentSpeed = rb.linearVelocity.magnitude * 3.6f; // km/h
+
+            // Automatic Forward / Reverse Transition
+            if (currentGearIndex >= 2) // In Forward gear
+            {
+                if (currentSpeed < 1.5f && _brakeInput > 0.3f && throttle < 0.1f)
+                {
+                    currentGearIndex = 0; // Switch to Reverse
+                    currentGear = GearState.Reverse;
+                }
+            }
+            else if (currentGearIndex == 0) // In Reverse gear
+            {
+                if (currentSpeed < 1.5f && throttle > 0.3f && _brakeInput < 0.1f)
+                {
+                    currentGearIndex = 2; // Switch to Drive 1
+                    currentGear = GearState.Drive;
+                }
+            }
+
+            float ratio = (gearRatios != null && currentGearIndex >= 0 && currentGearIndex < gearRatios.Length)
+                ? gearRatios[currentGearIndex] : 3.5f;
+
+            float wheelRPM = (rearLeft != null) ? WheelPhysicsHelper.GetWheelRPM(rearLeft) : 0f;
+            engineRPM = Mathf.Clamp(
                 WheelPhysicsHelper.ComputeEngineRPM(wheelRPM, ratio, finalDriveRatio),
                 idleRPM, maxRPM);
 
-            float torqueMult = engineTorqueCurve.Evaluate(engineRPM);
-            float appliedTorque = (currentGearIndex == 1) ? 0f
-                                : throttle * motorTorque * torqueMult;
+            float torqueMult = (engineTorqueCurve != null) ? engineTorqueCurve.Evaluate(engineRPM) : 1f;
+            float appliedTorque = 0f;
+            float serviceBrake = 0f;
+
+            if (currentGearIndex == 0) // Reverse
+            {
+                // When in reverse, brake pedal acts as accelerator backwards
+                appliedTorque = -_brakeInput * motorTorque * torqueMult;
+                serviceBrake  = throttle * brakeTorque;
+            }
+            else if (currentGearIndex >= 2) // Forward gears
+            {
+                appliedTorque = throttle * motorTorque * torqueMult;
+                serviceBrake  = _brakeInput * brakeTorque;
+            }
 
             WheelPhysicsHelper.ApplyMotorTorque(_driveWheels, appliedTorque);
 
             // Brakes
-            float brake = _brakeInput * brakeTorque;
             float hbRear = _handBrakeInput > 0.5f ? handBrakeTorque : 0f;
-            frontLeft.brakeTorque  = brake;
-            frontRight.brakeTorque = brake;
-            rearLeft.brakeTorque   = brake + hbRear;
-            rearRight.brakeTorque  = brake + hbRear;
-
-            currentSpeed = rb.linearVelocity.magnitude * 3.6f; // km/h
+            if (frontLeft != null)  frontLeft.brakeTorque  = serviceBrake;
+            if (frontRight != null) frontRight.brakeTorque = serviceBrake;
+            if (rearLeft != null)   rearLeft.brakeTorque   = serviceBrake + hbRear;
+            if (rearRight != null)  rearRight.brakeTorque  = serviceBrake + hbRear;
         }
 
         public override void ApplySteering()
         {
+            if (_steerWheels == null || _steerWheels.Length == 0 || _steerWheels[0] == null)
+            {
+                _steerWheels = new[] { frontLeft, frontRight };
+            }
             float steer = InputManagerProxy.Steer;
             WheelPhysicsHelper.ApplySteering(_steerWheels, steer, maxSteerAngle);
         }
@@ -146,7 +189,7 @@ namespace HeavyVehiclesWorld.Vehicles
         {
             _autoShiftCooldown -= Time.fixedDeltaTime;
             if (_autoShiftCooldown > 0f) return;
-            if (currentGearIndex < 2) return; // R or N – no auto
+            if (currentGearIndex < 2) return; // R or N handled above
 
             if (engineRPM > upShiftRPM && currentGearIndex < gearRatios.Length - 1)
             {
@@ -163,10 +206,14 @@ namespace HeavyVehiclesWorld.Vehicles
         // ── Mesh sync ─────────────────────────────────────────────────────
         private void SyncWheelMeshes()
         {
-            WheelPhysicsHelper.UpdateWheelPose(frontLeft,  frontLeftMesh);
-            WheelPhysicsHelper.UpdateWheelPose(frontRight, frontRightMesh);
-            WheelPhysicsHelper.UpdateWheelPose(rearLeft,   rearLeftMesh);
-            WheelPhysicsHelper.UpdateWheelPose(rearRight,  rearRightMesh);
+            if (frontLeftMesh != null && frontLeft != null)
+                WheelPhysicsHelper.UpdateWheelPose(frontLeft,  frontLeftMesh);
+            if (frontRightMesh != null && frontRight != null)
+                WheelPhysicsHelper.UpdateWheelPose(frontRight, frontRightMesh);
+            if (rearLeftMesh != null && rearLeft != null)
+                WheelPhysicsHelper.UpdateWheelPose(rearLeft,   rearLeftMesh);
+            if (rearRightMesh != null && rearRight != null)
+                WheelPhysicsHelper.UpdateWheelPose(rearRight,  rearRightMesh);
         }
 
         // ── Extras (lights, horn) ─────────────────────────────────────────

@@ -18,26 +18,26 @@ namespace HeavyVehiclesWorld.Vehicles
     {
         // ── Drive ──────────────────────────────────────────────────────────
         [Header("JCB – Drive")]
-        [SerializeField] private WheelCollider wheelFL;
-        [SerializeField] private WheelCollider wheelFR;
-        [SerializeField] private WheelCollider wheelRL;
-        [SerializeField] private WheelCollider wheelRR;
+        [SerializeField] public WheelCollider wheelFL;
+        [SerializeField] public WheelCollider wheelFR;
+        [SerializeField] public WheelCollider wheelRL;
+        [SerializeField] public WheelCollider wheelRR;
 
-        [SerializeField] private Transform meshFL;
-        [SerializeField] private Transform meshFR;
-        [SerializeField] private Transform meshRL;
-        [SerializeField] private Transform meshRR;
+        [SerializeField] public Transform meshFL;
+        [SerializeField] public Transform meshFR;
+        [SerializeField] public Transform meshRL;
+        [SerializeField] public Transform meshRR;
 
-        [SerializeField] private float motorTorque    = 2000f;
+        [SerializeField] private float motorTorque    = 5000f;
         [SerializeField] private float maxSteerAngle  = 30f;
         [SerializeField] private float topSpeedKmh    = 35f;
         [SerializeField] private bool  fourWheelDrive = true;
 
         // ── Front loader arm ───────────────────────────────────────────────
         [Header("JCB – Front Loader")]
-        [SerializeField] private Transform loaderBoomTransform;      // JCBBoom
-        [SerializeField] private Transform loaderArmTransform;       // JCBArm
-        [SerializeField] private Transform loaderBucketTransform;    // JCBBucket
+        [SerializeField] public Transform loaderBoomTransform;      // JCBBoom
+        [SerializeField] public Transform loaderArmTransform;       // JCBArm
+        [SerializeField] public Transform loaderBucketTransform;    // JCBBucket
 
         [SerializeField] private HydraulicArm loaderBoom;
         [SerializeField] private HydraulicArm loaderArm;
@@ -48,10 +48,10 @@ namespace HeavyVehiclesWorld.Vehicles
 
         // ── Rear backhoe arm ───────────────────────────────────────────────
         [Header("JCB – Rear Backhoe")]
-        [SerializeField] private Transform backhoeSwingTransform;    // horizontal pivot
-        [SerializeField] private Transform backhoeBoomTransform;
-        [SerializeField] private Transform backhoeDipperTransform;   // stick
-        [SerializeField] private Transform backhoeBucketTransform;
+        [SerializeField] public Transform backhoeSwingTransform;    // horizontal pivot
+        [SerializeField] public Transform backhoeBoomTransform;
+        [SerializeField] public Transform backhoeDipperTransform;   // stick
+        [SerializeField] public Transform backhoeBucketTransform;
 
         [SerializeField] private HydraulicArm backhoeSwing;
         [SerializeField] private HydraulicArm backhoeBoom;
@@ -118,13 +118,23 @@ namespace HeavyVehiclesWorld.Vehicles
             if (Mathf.Abs(rb.linearVelocity.magnitude) < topSpeedMs)
                 torque = throttle * motorTorque;
 
-            // Always drive rear wheels; optionally front too
-            wheelRL.motorTorque = torque;
-            wheelRR.motorTorque = torque;
-            if (fourWheelDrive)
+            if (Mathf.Abs(throttle) > 0.05f)
             {
-                wheelFL.motorTorque = torque;
-                wheelFR.motorTorque = torque;
+                if (wheelRL != null) { wheelRL.brakeTorque = 0f; wheelRL.motorTorque = torque; }
+                if (wheelRR != null) { wheelRR.brakeTorque = 0f; wheelRR.motorTorque = torque; }
+                if (fourWheelDrive)
+                {
+                    if (wheelFL != null) { wheelFL.brakeTorque = 0f; wheelFL.motorTorque = torque * 0.7f; }
+                    if (wheelFR != null) { wheelFR.brakeTorque = 0f; wheelFR.motorTorque = torque * 0.7f; }
+                }
+            }
+            else
+            {
+                float brakeT = 2500f;
+                if (wheelRL != null) { wheelRL.motorTorque = 0f; wheelRL.brakeTorque = brakeT; }
+                if (wheelRR != null) { wheelRR.motorTorque = 0f; wheelRR.brakeTorque = brakeT; }
+                if (wheelFL != null) { wheelFL.motorTorque = 0f; wheelFL.brakeTorque = brakeT; }
+                if (wheelFR != null) { wheelFR.motorTorque = 0f; wheelFR.brakeTorque = brakeT; }
             }
 
             currentSpeed = rb.linearVelocity.magnitude * 3.6f;

@@ -37,7 +37,7 @@ namespace HeavyVehiclesWorld.Vehicles
         // ── Tuning ────────────────────────────────────────────────────────
         [Header("Tuning")]
         public float maxSteerAngle   = 40f;
-        public float motorTorque     = 3000f;
+        public float motorTorque     = 6000f;
         public float maxBrakeTorque  = 8000f;
         public float idleRPM         = 600f;
 
@@ -69,7 +69,7 @@ namespace HeavyVehiclesWorld.Vehicles
         public Transform         frontHitch;
         public AttachedImplement attachedImplement = AttachedImplement.None;
 
-        [SerializeField] private Transform   hitchArmTransform;   // visual arm that raises/lowers
+        [SerializeField] public Transform hitchArmTransform;   // visual arm that raises/lowers
         [SerializeField] private float       hitchLiftAngleMin = -20f;
         [SerializeField] private float       hitchLiftAngleMax =  20f;
         [Range(0f, 1f)] public  float        hitchPosition;        // 0 = down, 1 = up
@@ -94,7 +94,7 @@ namespace HeavyVehiclesWorld.Vehicles
             base.Start();
             maxRPM = 2200f;
             rb.mass = 4000f;
-            rb.centerOfMass = new Vector3(0f, -0.4f, -0.3f);
+            rb.centerOfMass = new Vector3(0f, -0.1f, 0f);
         }
 
         private void FixedUpdate()
@@ -119,19 +119,34 @@ namespace HeavyVehiclesWorld.Vehicles
 
         public override void ApplyDriving()
         {
+            float rawThrottle = InputManagerProxy.Throttle;
+            float rawBrake    = InputManagerProxy.Brake;
+
+            if (currentSpeed < 1.5f && rawBrake > 0.1f && rawThrottle < 0.05f)
+            {
+                currentGearIndex = 0; // Reverse
+            }
+            else if (rawThrottle > 0.1f && currentGearIndex == 0)
+            {
+                currentGearIndex = 2; // 1st forward gear
+            }
+
+            throttlePedal = (currentGearIndex == 0) ? rawBrake : rawThrottle;
+            float brakeInput = (currentGearIndex == 0) ? rawThrottle : rawBrake;
+
             // Clutch reduces torque transfer: fully depressed = 0 torque
             float clutchFactor = 1f - Mathf.Clamp01(clutchPedal);
             bool  gearEngaged  = inGear && currentGearIndex != 1;
 
-            float ratio      = gearRatios[currentGearIndex];
-            float wheelRPM   = WheelPhysicsHelper.GetWheelRPM(rearLeft);
+            float ratio    = (gearRatios != null && currentGearIndex < gearRatios.Length) ? gearRatios[currentGearIndex] : 1f;
+            float wheelRPM = (rearLeft != null) ? WheelPhysicsHelper.GetWheelRPM(rearLeft) : 0f;
             engineRPM = Mathf.Clamp(
                 WheelPhysicsHelper.ComputeEngineRPM(wheelRPM, ratio, finalDriveRatio),
                 idleRPM, maxRPM);
 
             // Throttle pedal sets desired RPM; actual power is from that RPM + torque curve
             float desiredRPM = idleRPM + throttlePedal * (maxRPM - idleRPM);
-            engineRPM = Mathf.Lerp(engineRPM, desiredRPM, Time.fixedDeltaTime * 2f);
+            engineRPM = Mathf.Lerp(engineRPM, desiredRPM, Time.fixedDeltaTime * 10f);
 
             float torqueMult    = engineTorqueCurve.Evaluate(engineRPM);
             float appliedTorque = gearEngaged
@@ -153,7 +168,6 @@ namespace HeavyVehiclesWorld.Vehicles
             }
 
             // Brakes
-            float brakeInput = InputManagerProxy.Brake;
             WheelPhysicsHelper.ApplyBrakeTorque(
                 new[] { frontLeft, frontRight, rearLeft, rearRight },
                 brakeInput * maxBrakeTorque);

@@ -123,11 +123,35 @@ namespace HeavyVehiclesWorld.Vehicles
 
         public override void ApplyDriving()
         {
-            float throttle = InputManagerProxy.Throttle;
-            float brakeInput = InputManagerProxy.Brake;
+            if (_driveWheels == null || _driveWheels.Length == 0 || _driveWheels[0] == null)
+            {
+                if (rearLeft != null && rearRight != null)
+                    _driveWheels = new[] { rearLeft, rearRight };
+            }
+            if (_steerWheels == null || _steerWheels.Length == 0 || _steerWheels[0] == null)
+            {
+                if (frontLeft != null && frontRight != null)
+                    _steerWheels = new[] { frontLeft, frontRight };
+            }
 
-            float ratio    = gearRatios[currentGearIndex];
-            float wheelRPM = WheelPhysicsHelper.GetWheelRPM(rearLeft);
+            float rawThrottle = InputManagerProxy.Throttle;
+            float rawBrake    = InputManagerProxy.Brake;
+
+            // Seamless auto-reverse when stopped
+            if (currentSpeed < 1.5f && rawBrake > 0.1f && rawThrottle < 0.05f)
+            {
+                currentGearIndex = 0; // Reverse
+            }
+            else if (rawThrottle > 0.1f && currentGearIndex == 0)
+            {
+                currentGearIndex = 2; // 1st forward gear
+            }
+
+            float throttle   = (currentGearIndex == 0) ? rawBrake : rawThrottle;
+            float brakeInput = (currentGearIndex == 0) ? rawThrottle : rawBrake;
+
+            float ratio    = (gearRatios != null && currentGearIndex < gearRatios.Length) ? gearRatios[currentGearIndex] : 1.0f;
+            float wheelRPM = (rearLeft != null) ? WheelPhysicsHelper.GetWheelRPM(rearLeft) : 0f;
             engineRPM = Mathf.Clamp(
                 WheelPhysicsHelper.ComputeEngineRPM(wheelRPM, ratio, finalDriveRatio),
                 idleRPM, maxRPM);
@@ -136,7 +160,8 @@ namespace HeavyVehiclesWorld.Vehicles
             float appliedTorque = (currentGearIndex == 1) ? 0f
                                  : throttle * motorTorque * torqueMult;
 
-            WheelPhysicsHelper.ApplyMotorTorque(_driveWheels, appliedTorque);
+            if (_driveWheels != null)
+                WheelPhysicsHelper.ApplyMotorTorque(_driveWheels, appliedTorque);
 
             // Progressive air-brake build-up
             float targetBrake = brakeInput * maxBrakeTorque;
@@ -151,8 +176,8 @@ namespace HeavyVehiclesWorld.Vehicles
             // Handbrake (rear only)
             if (InputManagerProxy.HandBrake > 0.5f)
             {
-                rearLeft.brakeTorque  = handBrakeTorque;
-                rearRight.brakeTorque = handBrakeTorque;
+                if (rearLeft != null) rearLeft.brakeTorque = handBrakeTorque;
+                if (rearRight != null) rearRight.brakeTorque = handBrakeTorque;
             }
 
             currentSpeed = rb.linearVelocity.magnitude * 3.6f;

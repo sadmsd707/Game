@@ -16,6 +16,10 @@ namespace HeavyVehiclesWorld.Vehicles
         [Tooltip("The empty child GameObject named 'Model' where the downloaded 3D model is parented.")]
         public Transform modelSlot;
 
+        [Header("Fallback Placeholder Visuals")]
+        [Tooltip("Root transform of placeholder body and wheels, automatically shown when Model slot is empty, and hidden when real 3D model is present.")]
+        public GameObject placeholderVisuals;
+
         [Header("Vehicle Identity")]
         public VehicleType vehicleType = VehicleType.Car;
 
@@ -85,12 +89,17 @@ namespace HeavyVehiclesWorld.Vehicles
             }
 
             bool hasModel = modelSlot.childCount > 0;
+            if (placeholderVisuals != null)
+            {
+                placeholderVisuals.SetActive(!hasModel);
+            }
+
             if (!hasModel && !_hasWarnedMissing && Application.isPlaying)
             {
                 _hasWarnedMissing = true;
-                Debug.LogWarning($"[VehicleModelSlot] ⚠️ No 3D model asset found in '{transform.name}/Model' for {vehicleType}!\n" +
-                                 $"To import: Download the 3D model (.fbx/.obj) and drop it into 'Assets/Models/Vehicles/{vehicleType}/', then drag it into the 'Model' slot.\n" +
-                                 $"See ASSET_INTEGRATION_GUIDE.md for exact models, pivot rules, and rigging instructions.");
+                Debug.LogWarning($"[VehicleModelSlot] ℹ️ Using fallback placeholder geometry for {vehicleType} (Model slot is empty).\n" +
+                                 $"To import: Drop your 3D model (.fbx/.obj) into 'Assets/Models/Vehicles/{vehicleType}/' and drag it into the 'Model' slot.\n" +
+                                 $"The placeholder will automatically hide when a 3D model is detected.");
             }
             else if (hasModel)
             {
@@ -157,6 +166,17 @@ namespace HeavyVehiclesWorld.Vehicles
 
         private void LateUpdate()
         {
+            // Auto-hide placeholder when real model is present, or auto-show if empty
+            if (modelSlot != null && placeholderVisuals != null)
+            {
+                bool hasModel = modelSlot.childCount > 0;
+                if (placeholderVisuals.activeSelf == hasModel)
+                {
+                    placeholderVisuals.SetActive(!hasModel);
+                    if (hasModel) AutoBindPartsFromModel();
+                }
+            }
+
             // Sync all wheel meshes to their respective WheelColliders using GetWorldPose
             if (wheels != null && wheels.Length > 0)
             {

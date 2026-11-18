@@ -19,23 +19,23 @@ namespace HeavyVehiclesWorld.Vehicles
     {
         // ── Drive ──────────────────────────────────────────────────────────
         [Header("Harvester – Drive")]
-        [SerializeField] private WheelCollider wheelFL;
-        [SerializeField] private WheelCollider wheelFR;
-        [SerializeField] private WheelCollider wheelRL;
-        [SerializeField] private WheelCollider wheelRR;
+        [SerializeField] public WheelCollider wheelFL;
+        [SerializeField] public WheelCollider wheelFR;
+        [SerializeField] public WheelCollider wheelRL;
+        [SerializeField] public WheelCollider wheelRR;
 
-        [SerializeField] private Transform meshFL;
-        [SerializeField] private Transform meshFR;
-        [SerializeField] private Transform meshRL;
-        [SerializeField] private Transform meshRR;
+        [SerializeField] public Transform meshFL;
+        [SerializeField] public Transform meshFR;
+        [SerializeField] public Transform meshRL;
+        [SerializeField] public Transform meshRR;
 
-        [SerializeField] private float motorTorque   = 1800f;
+        [SerializeField] private float motorTorque   = 6000f;
         [SerializeField] private float maxSteerAngle = 25f;
-        [SerializeField] private float topSpeedKmh   = 15f;
+        [SerializeField] private float topSpeedKmh   = 20f;
 
         // ── Header ─────────────────────────────────────────────────────────
         [Header("Harvester – Header (Cutting Bar)")]
-        [SerializeField] private Transform headerTransform;
+        [SerializeField] public Transform headerTransform;
         [SerializeField] private Vector3   headerLoweredLocalPos   = new Vector3(0f, -0.8f, 2.2f);
         [SerializeField] private Vector3   headerRaisedLocalPos    = new Vector3(0f,  0.6f, 2.2f);
         [SerializeField] private float     headerMoveSpeed         = 1.0f;  // m/s
@@ -65,7 +65,7 @@ namespace HeavyVehiclesWorld.Vehicles
 
         // ── Unload auger ───────────────────────────────────────────────────
         [Header("Harvester – Unload Auger")]
-        [SerializeField] private Transform augerTransform;
+        [SerializeField] public Transform augerTransform;
         [SerializeField] private Vector3   augerExtendedLocalRot = new Vector3(0f, 90f, 0f);
         [SerializeField] private Vector3   augerRetractedLocalRot = new Vector3(0f, 0f, 0f);
         [SerializeField] private float     augerRotateSpeed      = 60f;   // deg/s
@@ -126,10 +126,24 @@ namespace HeavyVehiclesWorld.Vehicles
                 : (InputManagerProxy.Throttle - InputManagerProxy.Brake);
 
             float topSpeedMs = topSpeedKmh / 3.6f;
-            float torque    = rb.linearVelocity.magnitude < topSpeedMs ? throttle * motorTorque : 0f;
+            float torque = rb.linearVelocity.magnitude < topSpeedMs ? throttle * motorTorque : 0f;
 
-            wheelRL.motorTorque = torque;
-            wheelRR.motorTorque = torque;
+            if (Mathf.Abs(throttle) > 0.05f)
+            {
+                if (wheelFL != null) { wheelFL.brakeTorque = 0f; wheelFL.motorTorque = torque * 0.5f; }
+                if (wheelFR != null) { wheelFR.brakeTorque = 0f; wheelFR.motorTorque = torque * 0.5f; }
+                if (wheelRL != null) { wheelRL.brakeTorque = 0f; wheelRL.motorTorque = torque * 0.5f; }
+                if (wheelRR != null) { wheelRR.brakeTorque = 0f; wheelRR.motorTorque = torque * 0.5f; }
+            }
+            else
+            {
+                float brakeT = 3000f; // Idle hold brake
+                if (wheelFL != null) { wheelFL.motorTorque = 0f; wheelFL.brakeTorque = brakeT; }
+                if (wheelFR != null) { wheelFR.motorTorque = 0f; wheelFR.brakeTorque = brakeT; }
+                if (wheelRL != null) { wheelRL.motorTorque = 0f; wheelRL.brakeTorque = brakeT; }
+                if (wheelRR != null) { wheelRR.motorTorque = 0f; wheelRR.brakeTorque = brakeT; }
+            }
+
             currentSpeed = rb.linearVelocity.magnitude * 3.6f;
         }
 

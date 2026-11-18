@@ -101,7 +101,7 @@ namespace HeavyVehiclesWorld.Systems
             }
 
             // Skybox setup
-            if (customSkyboxMaterial != null)
+            if (customSkyboxMaterial != null && customSkyboxMaterial.shader != null && customSkyboxMaterial.shader.isSupported)
             {
                 RenderSettings.skybox = customSkyboxMaterial;
             }
@@ -113,11 +113,19 @@ namespace HeavyVehiclesWorld.Systems
                     var skyMat = new Material(proceduralSkyShader);
                     skyMat.SetFloat("_SunSize", 0.04f);
                     skyMat.SetFloat("_AtmosphereThickness", 1.0f);
-                    skyMat.SetColor("_SkyTint", new Color(0.38f, 0.58f, 0.85f));
-                    skyMat.SetColor("_GroundColor", new Color(0.26f, 0.32f, 0.24f));
+                    skyMat.SetColor("_SkyTint", new Color(0.42f, 0.65f, 0.90f));
+                    skyMat.SetColor("_GroundColor", new Color(0.26f, 0.34f, 0.22f));
                     skyMat.SetFloat("_Exposure", 1.0f);
                     RenderSettings.skybox = skyMat;
                 }
+            }
+
+            // Ensure Main Camera clears safely (never black or pink)
+            var cam = Camera.main;
+            if (cam != null)
+            {
+                cam.clearFlags = CameraClearFlags.Skybox;
+                cam.backgroundColor = new Color(0.42f, 0.65f, 0.90f);
             }
 
             // Balanced Trilight Ambient (Natural Daylight)
@@ -132,8 +140,7 @@ namespace HeavyVehiclesWorld.Systems
         // ══════════════════════════════════════════════════════════════════════
         public void InitializePBRMaterials()
         {
-            Shader pbrShader = Shader.Find("Universal Render Pipeline/Lit");
-            if (pbrShader == null) pbrShader = Shader.Find("Standard");
+            Shader pbrShader = GetSafeShader();
 
             // Car: Metallic Cobalt Blue
             carBodyPBR = CreatePBRMaterial(pbrShader, "M_PBR_Car_Body",
@@ -184,11 +191,41 @@ namespace HeavyVehiclesWorld.Systems
                 new Color(1.0f, 0.45f, 0.05f), metallic: 0.10f, smoothness: 0.40f);
         }
 
-        private Material CreatePBRMaterial(Shader shader, string name, Color baseColor, float metallic, float smoothness)
+        public static Shader GetSafeShader()
         {
+            Shader s = null;
+            if (GraphicsSettings.currentRenderPipeline != null)
+            {
+                s = Shader.Find("Universal Render Pipeline/Lit");
+            }
+            if (s == null) s = Shader.Find("Standard");
+            if (s == null) s = Shader.Find("Mobile/Diffuse");
+            if (s == null) s = Shader.Find("Diffuse");
+            if (s == null) s = Shader.Find("Unlit/Color");
+            return s;
+        }
+
+        public static Texture2D CreateProceduralTexture(Color col, int size = 64)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = col;
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public Material CreatePBRMaterial(Shader shader, string name, Color baseColor, float metallic, float smoothness)
+        {
+            if (shader == null || !shader.isSupported) shader = GetSafeShader();
             var mat = new Material(shader) { name = name };
 
-            // URP & Standard compatible property assignments
+            // Generate procedural fallback texture so surface is never black or untextured
+            Texture2D tex = CreateProceduralTexture(baseColor, 32);
+
+            // Both URP & Standard / Mobile compatible assignments
+            if (mat.HasProperty("_BaseMap"))   mat.SetTexture("_BaseMap", tex);
+            if (mat.HasProperty("_MainTex"))   mat.SetTexture("_MainTex", tex);
             if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", baseColor);
             if (mat.HasProperty("_Color"))     mat.SetColor("_Color", baseColor);
 
@@ -216,7 +253,7 @@ namespace HeavyVehiclesWorld.Systems
                 targetTerrain = terrainGo.GetComponent<Terrain>();
             }
 
-            // Create TerrainLayers with texture slots
+            // Create TerrainLayers with procedural fallback textures if missing
             if (grassLayer == null)
             {
                 grassLayer = new TerrainLayer
@@ -224,8 +261,13 @@ namespace HeavyVehiclesWorld.Systems
                     name = "Layer_Grass",
                     tileSize = new Vector2(10f, 10f),
                     smoothness = 0.2f,
-                    metallic = 0.0f
+                    metallic = 0.0f,
+                    diffuseTexture = CreateProceduralTexture(new Color(0.26f, 0.50f, 0.22f), 64)
                 };
+            }
+            else if (grassLayer.diffuseTexture == null)
+            {
+                grassLayer.diffuseTexture = CreateProceduralTexture(new Color(0.26f, 0.50f, 0.22f), 64);
             }
 
             if (dirtLayer == null)
@@ -235,8 +277,13 @@ namespace HeavyVehiclesWorld.Systems
                     name = "Layer_Dirt",
                     tileSize = new Vector2(8f, 8f),
                     smoothness = 0.15f,
-                    metallic = 0.0f
+                    metallic = 0.0f,
+                    diffuseTexture = CreateProceduralTexture(new Color(0.48f, 0.35f, 0.20f), 64)
                 };
+            }
+            else if (dirtLayer.diffuseTexture == null)
+            {
+                dirtLayer.diffuseTexture = CreateProceduralTexture(new Color(0.48f, 0.35f, 0.20f), 64);
             }
 
             if (asphaltLayer == null)
@@ -246,8 +293,13 @@ namespace HeavyVehiclesWorld.Systems
                     name = "Layer_Asphalt",
                     tileSize = new Vector2(12f, 12f),
                     smoothness = 0.25f,
-                    metallic = 0.05f
+                    metallic = 0.05f,
+                    diffuseTexture = CreateProceduralTexture(new Color(0.18f, 0.18f, 0.20f), 64)
                 };
+            }
+            else if (asphaltLayer.diffuseTexture == null)
+            {
+                asphaltLayer.diffuseTexture = CreateProceduralTexture(new Color(0.18f, 0.18f, 0.20f), 64);
             }
 
             if (rockLayer == null)
@@ -257,8 +309,13 @@ namespace HeavyVehiclesWorld.Systems
                     name = "Layer_Rock",
                     tileSize = new Vector2(14f, 14f),
                     smoothness = 0.18f,
-                    metallic = 0.05f
+                    metallic = 0.05f,
+                    diffuseTexture = CreateProceduralTexture(new Color(0.42f, 0.42f, 0.45f), 64)
                 };
+            }
+            else if (rockLayer.diffuseTexture == null)
+            {
+                rockLayer.diffuseTexture = CreateProceduralTexture(new Color(0.42f, 0.42f, 0.45f), 64);
             }
 
             if (targetTerrain != null && targetTerrain.terrainData != null)
@@ -321,6 +378,8 @@ namespace HeavyVehiclesWorld.Systems
         // ══════════════════════════════════════════════════════════════════════
         public void SetupPostProcessing()
         {
+            if (GraphicsSettings.currentRenderPipeline == null) return;
+
             var volumeGo = GameObject.Find("GlobalPostProcessVolume");
             if (volumeGo == null)
             {

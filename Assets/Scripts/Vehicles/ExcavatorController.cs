@@ -24,9 +24,9 @@ namespace HeavyVehiclesWorld.Vehicles
         [SerializeField] public WheelCollider[] leftTrackWheels  = new WheelCollider[4];
         [SerializeField] public WheelCollider[] rightTrackWheels = new WheelCollider[4];
 
-        [SerializeField] private float trackMotorTorque = 3000f;
+        [SerializeField] private float trackMotorTorque = 7000f;
         [SerializeField] private float trackBrakeTorque = 5000f;
-        [SerializeField] private float topSpeedKmh      = 10f;
+        [SerializeField] private float topSpeedKmh      = 12f;
 
         // ── Track speed state ──────────────────────────────────────────────
         private float _leftTrackSpeed;
@@ -128,6 +128,7 @@ namespace HeavyVehiclesWorld.Vehicles
 
             ApplyToTrack(leftTrackWheels,  _leftTrackSpeed,  speedRatio);
             ApplyToTrack(rightTrackWheels, _rightTrackSpeed, speedRatio);
+            currentSpeed = rb.linearVelocity.magnitude * 3.6f;
         }
 
         private void ApplyToTrack(WheelCollider[] wheels, float input, float speedRatio)

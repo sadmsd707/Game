@@ -142,13 +142,27 @@ namespace HeavyVehiclesWorld.Systems
             BuildWorldProps();
         }
 
+        private static Material CreateSafeMaterial(string name, Color color, float metallic = 0.1f, float smoothness = 0.3f)
+        {
+            var mat = new Material(HVW_VisualSystem.GetSafeShader()) { name = name };
+            var tex = HVW_VisualSystem.CreateProceduralTexture(color, 32);
+            if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", tex);
+            if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", tex);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", metallic);
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", smoothness);
+            if (mat.HasProperty("_Glossiness")) mat.SetFloat("_Glossiness", smoothness);
+            return mat;
+        }
+
         private void BuildRoadTrack()
         {
             var roadRoot = new GameObject("RoadNetwork");
             var vis = HVW_VisualSystem.Instance;
-            var asphaltMat = (vis != null && vis.asphaltRoadPBR != null) ? vis.asphaltRoadPBR : new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard")) { color = new Color(0.18f, 0.18f, 0.20f) };
-            var stripeMat  = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard")) { color = new Color(0.95f, 0.85f, 0.15f) };
-            var curbMat    = (vis != null && vis.concreteCurbsPBR != null) ? vis.concreteCurbsPBR : new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard")) { color = new Color(0.85f, 0.25f, 0.25f) };
+            var asphaltMat = (vis != null && vis.asphaltRoadPBR != null) ? vis.asphaltRoadPBR : CreateSafeMaterial("M_Road_Asphalt", new Color(0.18f, 0.18f, 0.20f), 0.05f, 0.2f);
+            var stripeMat  = CreateSafeMaterial("M_Road_Stripe", new Color(0.95f, 0.85f, 0.15f), 0.1f, 0.3f);
+            var curbMat    = (vis != null && vis.concreteCurbsPBR != null) ? vis.concreteCurbsPBR : CreateSafeMaterial("M_Road_Curb", new Color(0.85f, 0.25f, 0.25f), 0.05f, 0.2f);
 
             // Main Straight Road (North-South) - 400m long, 14m wide
             CreateRoadSegment(roadRoot, "Road_MainStraight", new Vector3(0, 0.02f, 0), new Vector3(14f, 0.05f, 400f), asphaltMat, stripeMat, curbMat);
@@ -162,7 +176,7 @@ namespace HeavyVehiclesWorld.Systems
             constrGround.transform.SetParent(roadRoot.transform);
             constrGround.transform.position = new Vector3(35f, 0.03f, 35f);
             constrGround.transform.localScale = new Vector3(60f, 0.05f, 60f);
-            constrGround.GetComponent<Renderer>().sharedMaterial = (vis != null && vis.constructionPropsPBR != null) ? vis.constructionPropsPBR : new Material(Shader.Find("Standard")) { color = new Color(0.55f, 0.38f, 0.22f) };
+            constrGround.GetComponent<Renderer>().sharedMaterial = (vis != null && vis.constructionPropsPBR != null) ? vis.constructionPropsPBR : CreateSafeMaterial("M_ConstructionDirt", new Color(0.55f, 0.38f, 0.22f));
 
             // Farm Field (Golden Wheat Yellow/Amber)
             var farmGround = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -170,7 +184,7 @@ namespace HeavyVehiclesWorld.Systems
             farmGround.transform.SetParent(roadRoot.transform);
             farmGround.transform.position = new Vector3(45f, 0.03f, -40f);
             farmGround.transform.localScale = new Vector3(80f, 0.05f, 80f);
-            farmGround.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.82f, 0.68f, 0.25f) };
+            farmGround.GetComponent<Renderer>().sharedMaterial = CreateSafeMaterial("M_WheatField", new Color(0.82f, 0.68f, 0.25f));
 
             // Quarry Dig Site (Grey Rock / Gravel)
             var quarryGround = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -178,7 +192,7 @@ namespace HeavyVehiclesWorld.Systems
             quarryGround.transform.SetParent(roadRoot.transform);
             quarryGround.transform.position = new Vector3(-35f, 0.03f, 35f);
             quarryGround.transform.localScale = new Vector3(60f, 0.05f, 60f);
-            quarryGround.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.40f, 0.40f, 0.42f) };
+            quarryGround.GetComponent<Renderer>().sharedMaterial = CreateSafeMaterial("M_QuarryGravel", new Color(0.40f, 0.40f, 0.42f));
         }
 
         private void CreateRoadSegment(GameObject parent, string name, Vector3 pos, Vector3 scale, Material roadMat, Material stripeMat, Material curbMat)
@@ -207,10 +221,10 @@ namespace HeavyVehiclesWorld.Systems
         {
             var propsRoot = new GameObject("WorldProps");
             var vis = HVW_VisualSystem.Instance;
-            var treeWoodMat   = new Material(Shader.Find("Standard")) { color = new Color(0.35f, 0.22f, 0.12f) };
-            var treeLeavesMat = new Material(Shader.Find("Standard")) { color = new Color(0.18f, 0.45f, 0.15f) };
-            var coneMat       = (vis != null && vis.constructionPropsPBR != null) ? vis.constructionPropsPBR : new Material(Shader.Find("Standard")) { color = new Color(1f, 0.45f, 0.05f) };
-            var crateMat      = new Material(Shader.Find("Standard")) { color = new Color(0.6f, 0.45f, 0.25f) };
+            var treeWoodMat   = CreateSafeMaterial("M_TreeWood", new Color(0.35f, 0.22f, 0.12f));
+            var treeLeavesMat = CreateSafeMaterial("M_TreeLeaves", new Color(0.18f, 0.45f, 0.15f));
+            var coneMat       = (vis != null && vis.constructionPropsPBR != null) ? vis.constructionPropsPBR : CreateSafeMaterial("M_Cone", new Color(1f, 0.45f, 0.05f));
+            var crateMat      = CreateSafeMaterial("M_Crate", new Color(0.6f, 0.45f, 0.25f));
 
             // Trees along road with CapsuleCollider for physical collision
             for (int i = -8; i <= 8; i++)
@@ -239,7 +253,7 @@ namespace HeavyVehiclesWorld.Systems
                 mound.transform.SetParent(propsRoot.transform);
                 mound.transform.position = new Vector3(28f + i * 8f, 0.8f, 40f + i * 5f);
                 mound.transform.localScale = new Vector3(7f, 3.5f, 7f);
-                mound.GetComponent<Renderer>().sharedMaterial = new Material(Shader.Find("Standard")) { color = new Color(0.48f, 0.32f, 0.18f) };
+                mound.GetComponent<Renderer>().sharedMaterial = CreateSafeMaterial("M_Mound", new Color(0.48f, 0.32f, 0.18f));
                 var col = mound.GetComponent<SphereCollider>();
                 if (col == null) col = mound.AddComponent<SphereCollider>();
             }
@@ -294,72 +308,72 @@ namespace HeavyVehiclesWorld.Systems
         {
             _allVehicles.Clear();
 
-            // 1. CAR (SUV) - Start position (0, 0.5, 0)
-            var car = CreateVehicleEntity("Car_SUV", VehicleType.Car, new Vector3(0f, 0.5f, 0f), Quaternion.identity,
-                new Color(0.12f, 0.45f, 0.85f), // Cobalt Blue
-                new Vector3(4.2f, 1.4f, 2.0f), 1500f);
+            // 1. CAR (SUV) - Start position (0, 0.55, 0)
+            var carColor = new Color(0.12f, 0.45f, 0.85f); // Cobalt Blue
+            var carSize  = new Vector3(2.0f, 1.4f, 4.4f);
+            var car = CreateVehicleEntity("Car_SUV", VehicleType.Car, new Vector3(0f, 0.55f, 0f), Quaternion.identity, carColor, carSize, 1500f);
             var carCtrl = car.AddComponent<CarController>();
             carCtrl.vehicleType = VehicleType.Car;
-            SetupVehiclePhysicsAndWheels(car, carCtrl, 0.4f, 1500f);
+            SetupVehiclePhysicsAndWheels(car, carCtrl, 0.38f, 1500f, carColor, carSize);
             _allVehicles.Add(carCtrl);
 
-            // 2. TRACTOR - Farm entrance (15, 0.5, 8)
-            var tractor = CreateVehicleEntity("Tractor_Agri", VehicleType.Tractor, new Vector3(15f, 0.5f, 8f), Quaternion.Euler(0, 45, 0),
-                new Color(0.18f, 0.65f, 0.22f), // Farm Green
-                new Vector3(3.8f, 2.2f, 2.2f), 4000f);
+            // 2. TRACTOR - Farm entrance (15, 0.65, 8)
+            var tracColor = new Color(0.18f, 0.65f, 0.22f); // Farm Green
+            var tracSize  = new Vector3(2.2f, 2.4f, 3.8f);
+            var tractor = CreateVehicleEntity("Tractor_Agri", VehicleType.Tractor, new Vector3(15f, 0.65f, 8f), Quaternion.Euler(0, 45, 0), tracColor, tracSize, 4000f);
             var tractorCtrl = tractor.AddComponent<TractorController>();
             tractorCtrl.vehicleType = VehicleType.Tractor;
-            SetupVehiclePhysicsAndWheels(tractor, tractorCtrl, 0.55f, 4000f);
+            SetupVehiclePhysicsAndWheels(tractor, tractorCtrl, 0.5f, 4000f, tracColor, tracSize);
             _allVehicles.Add(tractorCtrl);
 
-            // 3. TRUCK (Heavy Tipper) - (-18, 0.6, 15)
-            var truck = CreateVehicleEntity("Truck_Tipper", VehicleType.Truck, new Vector3(-18f, 0.6f, 15f), Quaternion.Euler(0, -30, 0),
-                new Color(0.85f, 0.85f, 0.88f), // Industrial White
-                new Vector3(7.5f, 2.8f, 2.6f), 8000f);
+            // 3. TRUCK (Heavy Tipper) - (-18, 0.75, 15)
+            var truckColor = new Color(0.85f, 0.85f, 0.88f); // Industrial White
+            var truckSize  = new Vector3(2.6f, 2.8f, 7.5f);
+            var truck = CreateVehicleEntity("Truck_Tipper", VehicleType.Truck, new Vector3(-18f, 0.75f, 15f), Quaternion.Euler(0, -30, 0), truckColor, truckSize, 8000f);
             var truckCtrl = truck.AddComponent<TruckController>();
             truckCtrl.vehicleType = VehicleType.Truck;
-            SetupVehiclePhysicsAndWheels(truck, truckCtrl, 0.6f, 8000f);
+            SetupVehiclePhysicsAndWheels(truck, truckCtrl, 0.6f, 8000f, truckColor, truckSize);
             _allVehicles.Add(truckCtrl);
 
-            // 4. JCB (Backhoe Loader) - (28, 0.6, 28)
-            var jcb = CreateVehicleEntity("JCB_Backhoe", VehicleType.JCB, new Vector3(28f, 0.6f, 28f), Quaternion.Euler(0, 90, 0),
-                new Color(0.98f, 0.78f, 0.05f), // JCB Yellow
-                new Vector3(5.2f, 2.6f, 2.4f), 7500f);
+            // 4. JCB (Backhoe Loader) - (28, 0.70, 28)
+            var jcbColor = new Color(0.98f, 0.78f, 0.05f); // JCB Yellow
+            var jcbSize  = new Vector3(2.4f, 2.6f, 5.2f);
+            var jcb = CreateVehicleEntity("JCB_Backhoe", VehicleType.JCB, new Vector3(28f, 0.70f, 28f), Quaternion.Euler(0, 90, 0), jcbColor, jcbSize, 7500f);
             var jcbCtrl = jcb.AddComponent<JCBController>();
             jcbCtrl.vehicleType = VehicleType.JCB;
-            SetupVehiclePhysicsAndWheels(jcb, jcbCtrl, 0.55f, 7500f);
+            SetupVehiclePhysicsAndWheels(jcb, jcbCtrl, 0.55f, 7500f, jcbColor, jcbSize);
             _allVehicles.Add(jcbCtrl);
 
-            // 5. EXCAVATOR - (-28, 0.6, 32)
-            var excavator = CreateVehicleEntity("Excavator_Tracked", VehicleType.Excavator, new Vector3(-28f, 0.6f, 32f), Quaternion.Euler(0, -90, 0),
-                new Color(0.95f, 0.45f, 0.08f), // Construction Orange
-                new Vector3(5.5f, 3.0f, 3.0f), 12000f);
+            // 5. EXCAVATOR - (-28, 0.70, 32)
+            var excColor = new Color(0.95f, 0.45f, 0.08f); // Construction Orange
+            var excSize  = new Vector3(3.0f, 3.0f, 5.5f);
+            var excavator = CreateVehicleEntity("Excavator_Tracked", VehicleType.Excavator, new Vector3(-28f, 0.70f, 32f), Quaternion.Euler(0, -90, 0), excColor, excSize, 12000f);
             var excCtrl = excavator.AddComponent<ExcavatorController>();
             excCtrl.vehicleType = VehicleType.Excavator;
-            SetupVehiclePhysicsAndWheels(excavator, excCtrl, 0.6f, 12000f);
+            SetupVehiclePhysicsAndWheels(excavator, excCtrl, 0.55f, 12000f, excColor, excSize);
             _allVehicles.Add(excCtrl);
 
-            // 6. HARVESTER - (42, 0.8, -25)
-            var harvester = CreateVehicleEntity("Harvester_Combine", VehicleType.Harvester, new Vector3(42f, 0.8f, -25f), Quaternion.Euler(0, 180, 0),
-                new Color(0.12f, 0.55f, 0.18f), // Combine Green
-                new Vector3(6.8f, 3.4f, 3.5f), 11000f);
+            // 6. HARVESTER - (42, 0.80, -25)
+            var harvColor = new Color(0.12f, 0.55f, 0.18f); // Combine Green
+            var harvSize  = new Vector3(3.2f, 3.4f, 7.0f);
+            var harvester = CreateVehicleEntity("Harvester_Combine", VehicleType.Harvester, new Vector3(42f, 0.80f, -25f), Quaternion.Euler(0, 180, 0), harvColor, harvSize, 11000f);
             var harvCtrl = harvester.AddComponent<HarvesterController>();
             harvCtrl.vehicleType = VehicleType.Harvester;
-            SetupVehiclePhysicsAndWheels(harvester, harvCtrl, 0.7f, 11000f);
+            SetupVehiclePhysicsAndWheels(harvester, harvCtrl, 0.65f, 11000f, harvColor, harvSize);
             _allVehicles.Add(harvCtrl);
         }
 
         private GameObject CreateVehicleEntity(string name, VehicleType type, Vector3 pos, Quaternion rot, Color bodyColor, Vector3 bodySize, float mass)
         {
             var root = new GameObject(name);
-            root.transform.position = pos;
+            root.transform.position = new Vector3(pos.x, Mathf.Max(pos.y, 0.75f), pos.z);
             root.transform.rotation = rot;
 
             // Rigidbody
             var rb = root.AddComponent<Rigidbody>();
             rb.mass = mass;
-            rb.drag = 0.08f;
-            rb.angularDrag = 1.5f;
+            rb.linearDamping = 0.08f;
+            rb.angularDamping = 1.5f;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
 
@@ -369,10 +383,10 @@ namespace HeavyVehiclesWorld.Systems
             audio.loop = true;
             audio.spatialBlend = 0.5f;
 
-            // Main Chassis Physics Collider
+            // Main Chassis Physics Collider (elevated off the ground so it never drags against road/terrain)
             var rootCol = root.AddComponent<BoxCollider>();
-            rootCol.size = bodySize;
-            rootCol.center = new Vector3(0f, bodySize.y * 0.5f, 0f);
+            rootCol.size = new Vector3(bodySize.x * 0.85f, bodySize.y * 0.55f, bodySize.z * 0.88f);
+            rootCol.center = new Vector3(0f, bodySize.y * 0.35f, 0f);
 
             // Empty "Model" child slot for imported 3D asset (FBX/OBJ/GLTF)
             var modelGo = new GameObject("Model");
@@ -385,17 +399,17 @@ namespace HeavyVehiclesWorld.Systems
             return root;
         }
 
-        private void SetupVehiclePhysicsAndWheels(GameObject root, VehicleController ctrl, float wheelRadius, float mass)
+        private void SetupVehiclePhysicsAndWheels(GameObject root, VehicleController ctrl, float wheelRadius, float mass, Color bodyColor, Vector3 bodySize)
         {
-            float halfW = 1.0f;
-            float halfL = 1.6f;
+            float halfW = bodySize.x * 0.45f;
+            float halfL = bodySize.z * 0.38f;
 
             Vector3[] wheelOffsets = new[]
             {
-                new Vector3(-halfW, wheelRadius,  halfL), // FL
-                new Vector3( halfW, wheelRadius,  halfL), // FR
-                new Vector3(-halfW, wheelRadius, -halfL), // RL
-                new Vector3( halfW, wheelRadius, -halfL)  // RR
+                new Vector3(-halfW, 0f,  halfL), // FL
+                new Vector3( halfW, 0f,  halfL), // FR
+                new Vector3(-halfW, 0f, -halfL), // RL
+                new Vector3( halfW, 0f, -halfL)  // RR
             };
 
             var wcs = new WheelCollider[4];
@@ -408,12 +422,13 @@ namespace HeavyVehiclesWorld.Systems
                 wGo.transform.localPosition = wheelOffsets[i];
 
                 var wc = wGo.AddComponent<WheelCollider>();
-                wc.radius = wheelRadius;
+                float actualRadius = (ctrl.vehicleType == VehicleType.Tractor) ? ((i >= 2) ? 0.65f : 0.45f) : wheelRadius;
+                wc.radius = actualRadius;
                 wc.suspensionDistance = 0.25f;
 
                 var spring = wc.suspensionSpring;
-                spring.spring = mass * 8f;
-                spring.damper = mass * 0.8f;
+                spring.spring = mass * 12f;
+                spring.damper = mass * 1.2f;
                 spring.targetPosition = 0.5f;
                 wc.suspensionSpring = spring;
 
@@ -433,7 +448,6 @@ namespace HeavyVehiclesWorld.Systems
             if (slot != null)
             {
                 slot.wheels = bindings;
-                slot.ValidateModelPresence();
             }
 
             ctrl.wheelColliders = wcs;
@@ -448,6 +462,287 @@ namespace HeavyVehiclesWorld.Systems
                 cc.rearLeft = wcs[2];
                 cc.rearRight = wcs[3];
             }
+            else if (ctrl is TruckController tk)
+            {
+                tk.frontLeft = wcs[0];
+                tk.frontRight = wcs[1];
+                tk.rearLeft = wcs[2];
+                tk.rearRight = wcs[3];
+            }
+            else if (ctrl is TractorController tc)
+            {
+                tc.frontLeft = wcs[0];
+                tc.frontRight = wcs[1];
+                tc.rearLeft = wcs[2];
+                tc.rearRight = wcs[3];
+            }
+            else if (ctrl is JCBController jcb)
+            {
+                jcb.wheelFL = wcs[0];
+                jcb.wheelFR = wcs[1];
+                jcb.wheelRL = wcs[2];
+                jcb.wheelRR = wcs[3];
+            }
+            else if (ctrl is ExcavatorController exc)
+            {
+                exc.leftTrackWheels = new[] { wcs[0], wcs[2] };
+                exc.rightTrackWheels = new[] { wcs[1], wcs[3] };
+            }
+            else if (ctrl is HarvesterController hc)
+            {
+                hc.wheelFL = wcs[0];
+                hc.wheelFR = wcs[1];
+                hc.wheelRL = wcs[2];
+                hc.wheelRR = wcs[3];
+            }
+
+            // Build visible fallback placeholder geometry for chassis, cabin, and wheels
+            BuildPlaceholderBody(root, ctrl.vehicleType, bodyColor, bodySize, slot, ctrl, wcs, wheelRadius);
+        }
+
+        private void BuildPlaceholderBody(GameObject root, VehicleType type, Color bodyColor, Vector3 bodySize, VehicleModelSlot slot, VehicleController ctrl, WheelCollider[] wcs, float wheelRadius)
+        {
+            var placeholderGo = new GameObject("PlaceholderVisuals");
+            placeholderGo.transform.SetParent(root.transform, false);
+
+            var vis = HVW_VisualSystem.Instance;
+            Material bodyMat = new Material(HVW_VisualSystem.GetSafeShader()) { name = $"M_Placeholder_{type}" };
+            var bodyTex = HVW_VisualSystem.CreateProceduralTexture(bodyColor, 32);
+            if (bodyMat.HasProperty("_MainTex")) bodyMat.SetTexture("_MainTex", bodyTex);
+            if (bodyMat.HasProperty("_BaseMap")) bodyMat.SetTexture("_BaseMap", bodyTex);
+            if (bodyMat.HasProperty("_Color")) bodyMat.SetColor("_Color", bodyColor);
+            if (bodyMat.HasProperty("_BaseColor")) bodyMat.SetColor("_BaseColor", bodyColor);
+
+            Material darkMat = new Material(HVW_VisualSystem.GetSafeShader()) { name = "M_Placeholder_Dark" };
+            var darkTex = HVW_VisualSystem.CreateProceduralTexture(new Color(0.14f, 0.16f, 0.20f), 32);
+            if (darkMat.HasProperty("_MainTex")) darkMat.SetTexture("_MainTex", darkTex);
+            if (darkMat.HasProperty("_BaseMap")) darkMat.SetTexture("_BaseMap", darkTex);
+            if (darkMat.HasProperty("_Color")) darkMat.SetColor("_Color", new Color(0.14f, 0.16f, 0.20f));
+            if (darkMat.HasProperty("_BaseColor")) darkMat.SetColor("_BaseColor", new Color(0.14f, 0.16f, 0.20f));
+
+            Material steelMat = new Material(HVW_VisualSystem.GetSafeShader()) { name = "M_Placeholder_Steel" };
+            var steelTex = HVW_VisualSystem.CreateProceduralTexture(new Color(0.25f, 0.26f, 0.28f), 32);
+            if (steelMat.HasProperty("_MainTex")) steelMat.SetTexture("_MainTex", steelTex);
+            if (steelMat.HasProperty("_BaseMap")) steelMat.SetTexture("_BaseMap", steelTex);
+            if (steelMat.HasProperty("_Color")) steelMat.SetColor("_Color", new Color(0.25f, 0.26f, 0.28f));
+            if (steelMat.HasProperty("_BaseColor")) steelMat.SetColor("_BaseColor", new Color(0.25f, 0.26f, 0.28f));
+
+            // 1. Vehicle-specific body assemblies
+            switch (type)
+            {
+                case VehicleType.Car:
+                    CreateBox("Car_Chassis", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.35f, 0f), new Vector3(bodySize.x, bodySize.y * 0.5f, bodySize.z), bodyMat);
+                    CreateBox("Car_Cabin", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.8f, -bodySize.z * 0.08f), new Vector3(bodySize.x * 0.85f, bodySize.y * 0.45f, bodySize.z * 0.55f), darkMat);
+                    break;
+
+                case VehicleType.Tractor:
+                    CreateBox("Tractor_Hood", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.38f, bodySize.z * 0.15f), new Vector3(bodySize.x * 0.65f, bodySize.y * 0.55f, bodySize.z * 0.55f), bodyMat);
+                    CreateBox("Tractor_Cabin", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.78f, -bodySize.z * 0.22f), new Vector3(bodySize.x * 0.82f, bodySize.y * 0.6f, bodySize.z * 0.4f), darkMat);
+
+                    var hitchPivot = new GameObject("Hitch_Pivot");
+                    hitchPivot.transform.SetParent(placeholderGo.transform, false);
+                    hitchPivot.transform.localPosition = new Vector3(0f, 0.45f, -bodySize.z * 0.48f);
+                    CreateBox("Hitch_Bar", hitchPivot.transform, new Vector3(0f, 0f, -0.35f), new Vector3(0.8f, 0.15f, 0.7f), steelMat);
+                    slot.threePointHitch = hitchPivot.transform;
+                    if (ctrl is TractorController tc)
+                    {
+                        tc.rearHitch = hitchPivot.transform;
+                        tc.hitchArmTransform = hitchPivot.transform;
+                    }
+                    break;
+
+                case VehicleType.Truck:
+                    CreateBox("Truck_Frame", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.25f, 0f), new Vector3(bodySize.x * 0.7f, bodySize.y * 0.25f, bodySize.z), steelMat);
+                    CreateBox("Truck_Cab", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.7f, bodySize.z * 0.32f), new Vector3(bodySize.x * 0.95f, bodySize.y * 0.65f, bodySize.z * 0.32f), bodyMat);
+
+                    var tipperPivot = new GameObject("Tipper_Pivot");
+                    tipperPivot.transform.SetParent(placeholderGo.transform, false);
+                    tipperPivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.42f, -bodySize.z * 0.44f);
+                    CreateBox("Tipper_Bed", tipperPivot.transform, new Vector3(0f, bodySize.y * 0.28f, bodySize.z * 0.32f), new Vector3(bodySize.x, bodySize.y * 0.5f, bodySize.z * 0.62f), bodyMat);
+                    slot.tipperBed = tipperPivot.transform;
+                    if (ctrl is TruckController tk)
+                    {
+                        tk.tipperBed = tipperPivot.transform;
+                    }
+                    break;
+
+                case VehicleType.JCB:
+                    CreateBox("JCB_Cab", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.62f, 0f), new Vector3(bodySize.x * 0.85f, bodySize.y * 0.62f, bodySize.z * 0.65f), bodyMat);
+
+                    // Front Loader
+                    var loaderPivot = new GameObject("Loader_Pivot");
+                    loaderPivot.transform.SetParent(placeholderGo.transform, false);
+                    loaderPivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.45f, bodySize.z * 0.35f);
+                    CreateBox("Loader_Arm", loaderPivot.transform, new Vector3(0f, 0f, 0.65f), new Vector3(bodySize.x * 0.8f, 0.2f, 1.3f), bodyMat);
+                    CreateBox("Loader_Bucket", loaderPivot.transform, new Vector3(0f, -0.1f, 1.35f), new Vector3(bodySize.x * 1.05f, 0.55f, 0.65f), steelMat);
+                    slot.frontLoaderBoom = loaderPivot.transform;
+                    slot.frontLoaderBucket = loaderPivot.transform;
+
+                    // Rear Backhoe
+                    var backhoePivot = new GameObject("Backhoe_Pivot");
+                    backhoePivot.transform.SetParent(placeholderGo.transform, false);
+                    backhoePivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.5f, -bodySize.z * 0.42f);
+                    CreateBox("Backhoe_Boom", backhoePivot.transform, new Vector3(0f, 0.5f, -0.8f), new Vector3(0.35f, 0.35f, 1.6f), bodyMat);
+                    CreateBox("Backhoe_Bucket", backhoePivot.transform, new Vector3(0f, 0.1f, -1.7f), new Vector3(0.55f, 0.45f, 0.55f), steelMat);
+                    slot.boomArm = backhoePivot.transform;
+                    slot.stickArm = backhoePivot.transform;
+                    slot.bucket = backhoePivot.transform;
+                    if (ctrl is JCBController jcb)
+                    {
+                        jcb.loaderBoomTransform = loaderPivot.transform;
+                        jcb.backhoeBoomTransform = backhoePivot.transform;
+                    }
+                    break;
+
+                case VehicleType.Excavator:
+                    CreateBox("Excavator_Tracks", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.22f, 0f), new Vector3(bodySize.x, bodySize.y * 0.32f, bodySize.z), steelMat);
+
+                    var cabinPivot = new GameObject("RotatingCabin_Pivot");
+                    cabinPivot.transform.SetParent(placeholderGo.transform, false);
+                    cabinPivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.38f, 0f);
+                    CreateBox("Excavator_CabinBody", cabinPivot.transform, new Vector3(0f, bodySize.y * 0.35f, -bodySize.z * 0.08f), new Vector3(bodySize.x * 0.85f, bodySize.y * 0.6f, bodySize.z * 0.75f), bodyMat);
+
+                    var excBoom = new GameObject("Excavator_Boom");
+                    excBoom.transform.SetParent(cabinPivot.transform, false);
+                    excBoom.transform.localPosition = new Vector3(0.5f, bodySize.y * 0.4f, 0.8f);
+                    CreateBox("Boom_Bar", excBoom.transform, new Vector3(0f, 0.6f, 1.0f), new Vector3(0.35f, 0.35f, 2.2f), bodyMat);
+                    CreateBox("Bucket_Tool", excBoom.transform, new Vector3(0f, 0.1f, 2.2f), new Vector3(0.7f, 0.6f, 0.7f), steelMat);
+
+                    slot.rotatingCabin = cabinPivot.transform;
+                    slot.boomArm = excBoom.transform;
+                    if (ctrl is ExcavatorController ec)
+                    {
+                        ec.cabinTransform = cabinPivot.transform;
+                    }
+                    break;
+
+                case VehicleType.Harvester:
+                    CreateBox("Harvester_Body", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.62f, 0f), new Vector3(bodySize.x * 0.85f, bodySize.y * 0.68f, bodySize.z * 0.85f), bodyMat);
+                    CreateBox("Harvester_Cab", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.95f, bodySize.z * 0.25f), new Vector3(bodySize.x * 0.7f, bodySize.y * 0.45f, bodySize.z * 0.35f), darkMat);
+
+                    var headerPivot = new GameObject("CutterHeader_Pivot");
+                    headerPivot.transform.SetParent(placeholderGo.transform, false);
+                    headerPivot.transform.localPosition = new Vector3(0f, 0.4f, bodySize.z * 0.48f);
+                    CreateBox("Cutter_Bar", headerPivot.transform, new Vector3(0f, 0f, 0.6f), new Vector3(bodySize.x * 1.35f, 0.5f, 0.85f), new Color(0.85f, 0.25f, 0.25f));
+                    slot.cutterHeader = headerPivot.transform;
+                    if (ctrl is HarvesterController hc)
+                    {
+                        hc.headerTransform = headerPivot.transform;
+                    }
+
+                    var augerPivot = new GameObject("Auger_Pivot");
+                    augerPivot.transform.SetParent(placeholderGo.transform, false);
+                    augerPivot.transform.localPosition = new Vector3(-bodySize.x * 0.45f, bodySize.y * 0.88f, -0.4f);
+                    CreateBox("Auger_Pipe", augerPivot.transform, new Vector3(-1.5f, 0f, 0f), new Vector3(3.0f, 0.25f, 0.25f), steelMat);
+                    slot.unloadAuger = augerPivot.transform;
+                    if (ctrl is HarvesterController hc2)
+                    {
+                        hc2.augerTransform = augerPivot.transform;
+                    }
+                    break;
+            }
+
+            // 2. Placeholder Cylinder Wheels
+            var wheelsContainer = new GameObject("PlaceholderWheels");
+            wheelsContainer.transform.SetParent(placeholderGo.transform, false);
+
+            Material tireMat = (vis != null && vis.rubberTiresPBR != null)
+                ? vis.rubberTiresPBR
+                : new Material(HVW_VisualSystem.GetSafeShader()) { color = new Color(0.12f, 0.12f, 0.12f) };
+
+            for (int i = 0; i < wcs.Length; i++)
+            {
+                var wc = wcs[i];
+                if (wc == null) continue;
+
+                float r = (type == VehicleType.Tractor) ? ((i >= 2) ? 0.65f : 0.45f) : wheelRadius;
+                float width = (type == VehicleType.Truck || type == VehicleType.Harvester) ? 0.45f : 0.32f;
+
+                // Dedicated wheel root transform synced to WheelCollider.GetWorldPose
+                var wHolder = new GameObject($"PlaceholderWheel_{i}");
+                wHolder.transform.SetParent(wheelsContainer.transform, false);
+                wHolder.transform.localPosition = wc.transform.localPosition;
+
+                // Cylinder mesh oriented along local wheel axle (Z=90 deg)
+                var cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                cyl.name = "WheelTireMesh";
+                cyl.transform.SetParent(wHolder.transform, false);
+                cyl.transform.localPosition = Vector3.zero;
+                cyl.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                cyl.transform.localScale = new Vector3(r * 2f, width * 0.5f, r * 2f);
+                cyl.GetComponent<Renderer>().sharedMaterial = tireMat;
+
+                var c = cyl.GetComponent<Collider>();
+                if (c) Destroy(c);
+
+                if (slot != null && i < slot.wheels.Length)
+                {
+                    slot.wheels[i].mesh = wHolder.transform;
+                }
+
+                if (ctrl is CarController cc)
+                {
+                    if (i == 0) cc.frontLeftMesh = wHolder.transform;
+                    else if (i == 1) cc.frontRightMesh = wHolder.transform;
+                    else if (i == 2) cc.rearLeftMesh = wHolder.transform;
+                    else if (i == 3) cc.rearRightMesh = wHolder.transform;
+                }
+                else if (ctrl is TruckController tk)
+                {
+                    if (i == 0) tk.frontLeftMesh = wHolder.transform;
+                    else if (i == 1) tk.frontRightMesh = wHolder.transform;
+                    else if (i == 2) tk.rearLeftMesh = wHolder.transform;
+                    else if (i == 3) tk.rearRightMesh = wHolder.transform;
+                }
+                else if (ctrl is TractorController tc)
+                {
+                    if (i == 0) tc.frontLeftMesh = wHolder.transform;
+                    else if (i == 1) tc.frontRightMesh = wHolder.transform;
+                    else if (i == 2) tc.rearLeftMesh = wHolder.transform;
+                    else if (i == 3) tc.rearRightMesh = wHolder.transform;
+                }
+                else if (ctrl is JCBController jcb)
+                {
+                    if (i == 0) jcb.meshFL = wHolder.transform;
+                    else if (i == 1) jcb.meshFR = wHolder.transform;
+                    else if (i == 2) jcb.meshRL = wHolder.transform;
+                    else if (i == 3) jcb.meshRR = wHolder.transform;
+                }
+                else if (ctrl is HarvesterController hc)
+                {
+                    if (i == 0) hc.meshFL = wHolder.transform;
+                    else if (i == 1) hc.meshFR = wHolder.transform;
+                    else if (i == 2) hc.meshRL = wHolder.transform;
+                    else if (i == 3) hc.meshRR = wHolder.transform;
+                }
+            }
+
+            slot.placeholderVisuals = placeholderGo;
+            slot.ValidateModelPresence();
+        }
+
+        private GameObject CreateBox(string name, Transform parent, Vector3 localPos, Vector3 localScale, Color color)
+        {
+            Material mat = new Material(HVW_VisualSystem.GetSafeShader()) { name = $"M_{name}" };
+            var tex = HVW_VisualSystem.CreateProceduralTexture(color, 32);
+            if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", tex);
+            if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", tex);
+            if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            return CreateBox(name, parent, localPos, localScale, mat);
+        }
+
+        private GameObject CreateBox(string name, Transform parent, Vector3 localPos, Vector3 localScale, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = localScale;
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            var c = go.GetComponent<Collider>();
+            if (c) Destroy(c);
+            return go;
         }
 
         // ══════════════════════════════════════════════════════════════════════

@@ -672,3 +672,83 @@ Removed all primitive shape generation. Replaced with `VehicleModelSlot` featuri
 
 **Related to:** Asset Integration, VehicleModelSlot, PBR Materials, TerrainLayers, Calibrated Lighting, Post-Processing, UI Layout Deconfliction, Mobile Touch HUD, Android Production Release
 ---
+
+
+### Change #29 | 2026-11-19 03:00:00
+**Files changed:**
+- Assets/Scripts/Vehicles/VehicleModelSlot.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_VisualSystem.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Scripts/Vehicles/CarController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/TruckController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/TractorController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/JCBController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/ExcavatorController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/HarvesterController.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (NEW)
+
+**What changed:**
+- Executed STEP 0 - RECOVERY: Restored visible, colored fallback placeholder bodies and wheels for all 6 vehicles whenever the `Model` slot is empty. When a real 3D model is dropped in the slot, `VehicleModelSlot` automatically hides the placeholder.
+- Implemented robust wheel visual synchronization: each wheel mesh is mounted on a parent container aligned to `WheelCollider.GetWorldPose()`, and primitive cylinder wheels are pre-rotated 90° along the axle so they roll and steer realistically.
+- Fixed vehicle physics and wheel wiring across all 6 vehicle controllers (`CarController`, `TruckController`, `TractorController`, `JCBController`, `ExcavatorController`, `HarvesterController`):
+  - Car: Wired FL/FR/RL/RR WheelColliders, auto-reverse on brake while stopped.
+  - Truck: Wired WheelColliders, pneumatic air-brake build-up, tipper bed tilt pivot.
+  - Tractor: Balanced center of mass, realistic staggered wheel radii (0.45m front, 0.65m rear), responsive engine RPM, 3-point hitch lift pivot.
+  - JCB: 4WD torque distribution, front loader boom & rear backhoe pivot rigging.
+  - Excavator: Dual-track differential drive torque, 360° rotating cabin pivot, boom/stick/bucket rigging.
+  - Harvester: All-wheel drive torque, cutting header lower/raise pivot, unload auger pivot.
+- Fixed terrain and world materials to prevent pink/black/white shaders: implemented `HVW_VisualSystem.GetSafeShader()` with runtime fallback and procedural fallback textures for all 4 TerrainLayers (Grass, Dirt, Asphalt, Rock) and world props.
+- Elevated vehicle chassis BoxColliders so that only wheels bear contact with the terrain/road without chassis friction locking.
+- Created `HVW_PlayModeRecoveryTest.cs` and verified automated Play-Mode execution in Unity Editor (batchmode).
+
+**New code:**
+```csharp
+// VehicleModelSlot.cs - Auto-toggle placeholder visuals
+bool hasModel = modelSlot.childCount > 0;
+if (placeholderVisuals != null)
+{
+    placeholderVisuals.SetActive(!hasModel);
+}
+
+// HVW_VisualSystem.cs - Safe shader detection immune to missing runtime URP assets
+public static Shader GetSafeShader()
+{
+    Shader s = null;
+    if (GraphicsSettings.currentRenderPipeline != null)
+        s = Shader.Find("Universal Render Pipeline/Lit");
+    if (s == null) s = Shader.Find("Standard");
+    if (s == null) s = Shader.Find("Mobile/Diffuse");
+    if (s == null) s = Shader.Find("Diffuse");
+    if (s == null) s = Shader.Find("Unlit/Color");
+    return s;
+}
+
+// HVW_WorldInitializer.cs - WheelCollider and mesh wiring for all 6 vehicles
+if (ctrl is CarController cc) { cc.frontLeft = wcs[0]; cc.frontRight = wcs[1]; cc.rearLeft = wcs[2]; cc.rearRight = wcs[3]; }
+else if (ctrl is TruckController tk) { tk.frontLeft = wcs[0]; tk.frontRight = wcs[1]; tk.rearLeft = wcs[2]; tk.rearRight = wcs[3]; }
+else if (ctrl is TractorController tc) { tc.frontLeft = wcs[0]; tc.frontRight = wcs[1]; tc.rearLeft = wcs[2]; tc.rearRight = wcs[3]; }
+else if (ctrl is JCBController jcb) { jcb.wheelFL = wcs[0]; jcb.wheelFR = wcs[1]; jcb.wheelRL = wcs[2]; jcb.wheelRR = wcs[3]; }
+else if (ctrl is ExcavatorController exc) { exc.leftTrackWheels = new[] { wcs[0], wcs[2] }; exc.rightTrackWheels = new[] { wcs[1], wcs[3] }; }
+else if (ctrl is HarvesterController hc) { hc.wheelFL = wcs[0]; hc.wheelFR = wcs[1]; hc.wheelRL = wcs[2]; hc.wheelRR = wcs[3]; }
+```
+
+**Why:**
+After Change #28 removed primitive art generators in favor of external 3D models, vehicles were invisible because no 3D models had yet been imported into `Assets/Models/Vehicles/*`. Furthermore, vehicles could not move because non-car controllers had null wheel collider references, and the root BoxColliders contacted the terrain plane causing ground-friction lock.
+
+*Previous code:*
+```csharp
+// In Change #28: Primitive body generation was deleted completely, leaving vehicles invisible:
+// VehicleModelSlot had no fallback visuals when Model slot was empty.
+// In HVW_WorldInitializer: only CarController had wheel colliders wired:
+if (ctrl is CarController cc)
+{
+    cc.frontLeft = wcs[0];
+    cc.frontRight = wcs[1];
+    cc.rearLeft = wcs[2];
+    cc.rearRight = wcs[3];
+}
+// Other 5 vehicles had null wheel colliders and could not drive.
+```
+
+**Related to:** Step 0 Recovery, VehicleModelSlot, Placeholder Visuals, Drivability, WheelCollider, PBR Fallback, Automated PlayMode Test
+---
