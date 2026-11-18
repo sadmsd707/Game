@@ -14,7 +14,7 @@ namespace HeavyVehiclesWorld.Vehicles
 
     /// <summary>
     /// Farm tractor controller. Inherits VehicleController.
-    /// Features: 4WD toggle, PTO, 3-point hitch (raise/lower), clutch simulation,
+    /// Features: 4WD toggle, PTO, 3-point hitch (raise/lower), anti-roll stability,
     /// separate throttle pedal, and front/rear implement attachment.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
@@ -34,11 +34,19 @@ namespace HeavyVehiclesWorld.Vehicles
         public Transform rearLeftMesh;
         public Transform rearRightMesh;
 
+        // ── Suspension & Stability ────────────────────────────────────────
+        [Header("Suspension & Stability")]
+        public float antiRollStiffness = 9000f;
+        public float downforceCoefficient = 2.0f;
+        public float steerSensitivity = 7.0f;
+        private float _currentSmoothedSteer;
+
         // ── Tuning ────────────────────────────────────────────────────────
         [Header("Tuning")]
         public float maxSteerAngle   = 40f;
-        public float motorTorque     = 6000f;
-        public float maxBrakeTorque  = 8000f;
+        public float motorTorque     = 6500f;
+        public float maxBrakeTorque  = 10000f;
+        public float handBrakeTorque = 15000f;
         public float idleRPM         = 600f;
 
         // ── Gearbox ───────────────────────────────────────────────────────
@@ -53,7 +61,7 @@ namespace HeavyVehiclesWorld.Vehicles
 
         // ── PTO ───────────────────────────────────────────────────────────
         [Header("Power Take-Off (PTO)")]
-        public bool  ptoActive;
+        public bool  ptoActive = true;
         public float ptoRPM;             // read-only runtime value
         [SerializeField] private float ptoRatioToEngine = 0.4f;
 
@@ -72,7 +80,7 @@ namespace HeavyVehiclesWorld.Vehicles
         [SerializeField] public Transform hitchArmTransform;   // visual arm that raises/lowers
         [SerializeField] private float       hitchLiftAngleMin = -20f;
         [SerializeField] private float       hitchLiftAngleMax =  20f;
-        [Range(0f, 1f)] public  float        hitchPosition;        // 0 = down, 1 = up
+        [Range(0f, 1f)] public  float        hitchPosition = 1f; // 0 = lowered (working), 1 = raised (transport)
 
         // ── Engine torque curve ───────────────────────────────────────────
         [Header("Engine Torque Curve")]
@@ -94,7 +102,13 @@ namespace HeavyVehiclesWorld.Vehicles
             base.Start();
             maxRPM = 2200f;
             rb.mass = 4000f;
-            rb.centerOfMass = new Vector3(0f, -0.1f, 0f);
+            rb.centerOfMass = new Vector3(0f, -0.2f, 0.1f);
+            ptoActive = true;
+
+            ConfigureWheelFriction(frontLeft);
+            ConfigureWheelFriction(frontRight);
+            ConfigureWheelFriction(rearLeft);
+            ConfigureWheelFriction(rearRight);
         }
 
         private void FixedUpdate()
@@ -103,15 +117,19 @@ namespace HeavyVehiclesWorld.Vehicles
             ReadThrottleAndClutch();
             ApplyDriving();
             ApplySteering();
+            ApplyAntiRoll(frontLeft, frontRight);
+            ApplyAntiRoll(rearLeft, rearRight);
+            ApplyAerodynamicDownforce();
             SyncWheelMeshes();
             UpdatePTO();
+            UpdateHitchArm();
             ConsumeFuel();
         }
 
         protected override void Update()
         {
             base.Update();
-            UpdateHitchArm();
+            UpdateEngineSound();
             HandleExtras();
         }
 
@@ -122,6 +140,7 @@ namespace HeavyVehiclesWorld.Vehicles
             float rawThrottle = InputManagerProxy.Throttle;
             float rawBrake    = InputManagerProxy.Brake;
 
+            // Seamless auto-reverse when stopped
             if (currentSpeed < 1.5f && rawBrake > 0.1f && rawThrottle < 0.05f)
             {
                 currentGearIndex = 0; // Reverse
@@ -172,43 +191,152 @@ namespace HeavyVehiclesWorld.Vehicles
                 new[] { frontLeft, frontRight, rearLeft, rearRight },
                 brakeInput * maxBrakeTorque);
 
+            // Handbrake (rear wheels)
+            if (InputManagerProxy.HandBrake > 0.5f)
+            {
+                if (rearLeft != null) rearLeft.brakeTorque = handBrakeTorque;
+                if (rearRight != null) rearRight.brakeTorque = handBrakeTorque;
+            }
+
             currentSpeed = rb.linearVelocity.magnitude * 3.6f;
         }
 
         public override void ApplySteering()
         {
-            float steer = InputManagerProxy.Steer;
-            WheelPhysicsHelper.ApplySteering(
-                new[] { frontLeft, frontRight }, steer, maxSteerAngle);
+            float targetSteer = InputManagerProxy.Steer;
+            _currentSmoothedSteer = Mathf.Lerp(_currentSmoothedSteer, targetSteer, Time.fixedDeltaTime * steerSensitivity);
+
+            float speedKmh = rb != null ? rb.linearVelocity.magnitude * 3.6f : 0f;
+            float speedFactor = Mathf.Clamp01(speedKmh / 50f);
+            float effectiveSteerAngle = Mathf.Lerp(maxSteerAngle, 18f, speedFactor);
+
+            if (frontLeft != null) frontLeft.steerAngle = _currentSmoothedSteer * effectiveSteerAngle;
+            if (frontRight != null) frontRight.steerAngle = _currentSmoothedSteer * effectiveSteerAngle;
+        }
+
+        public void ApplyAntiRoll(WheelCollider left, WheelCollider right)
+        {
+            if (left == null || right == null || rb == null) return;
+
+            float travelL = 1.0f;
+            float travelR = 1.0f;
+
+            bool groundedL = left.GetGroundHit(out WheelHit hitL);
+            if (groundedL)
+                travelL = (-left.transform.InverseTransformPoint(hitL.point).y - left.radius) / left.suspensionDistance;
+
+            bool groundedR = right.GetGroundHit(out WheelHit hitR);
+            if (groundedR)
+                travelR = (-right.transform.InverseTransformPoint(hitR.point).y - right.radius) / right.suspensionDistance;
+
+            float antiRollForce = (travelL - travelR) * antiRollStiffness;
+
+            if (groundedL)
+                rb.AddForceAtPosition(left.transform.up * -antiRollForce, left.transform.position);
+            if (groundedR)
+                rb.AddForceAtPosition(right.transform.up * antiRollForce, right.transform.position);
+        }
+
+        public void ApplyAerodynamicDownforce()
+        {
+            if (rb == null) return;
+            rb.AddForce(-transform.up * downforceCoefficient * rb.linearVelocity.sqrMagnitude);
+        }
+
+        private void ConfigureWheelFriction(WheelCollider wc)
+        {
+            if (wc == null) return;
+
+            WheelFrictionCurve fwd = wc.forwardFriction;
+            fwd.extremumSlip = 0.40f;
+            fwd.extremumValue = 1.0f;
+            fwd.asymptoteSlip = 0.80f;
+            fwd.asymptoteValue = 0.70f;
+            fwd.stiffness = 1.5f;
+            wc.forwardFriction = fwd;
+
+            WheelFrictionCurve side = wc.sidewaysFriction;
+            side.extremumSlip = 0.35f;
+            side.extremumValue = 1.0f;
+            side.asymptoteSlip = 0.65f;
+            side.asymptoteValue = 0.80f;
+            side.stiffness = 1.6f;
+            wc.sidewaysFriction = side;
         }
 
         public override void UpdateEngineSound()
         {
             if (engineAudioSource == null) return;
-            if (!engineAudioSource.isPlaying) engineAudioSource.Play();
-            engineAudioSource.pitch = 0.5f + (engineRPM / maxRPM) * 1.5f;
+            if (engineAudioSource.clip == null)
+            {
+                engineAudioSource.clip = CreateProceduralTractorDieselClip();
+            }
+
+            if (!engineAudioSource.isPlaying)
+            {
+                engineAudioSource.loop = true;
+                engineAudioSource.Play();
+            }
+
+            float rpmRatio = Mathf.Clamp01(engineRPM / maxRPM);
+            engineAudioSource.pitch = Mathf.Lerp(0.70f, 1.90f, rpmRatio);
+            engineAudioSource.volume = Mathf.Lerp(0.40f, 0.90f, 0.4f + 0.6f * Mathf.Abs(throttlePedal));
+        }
+
+        public static AudioClip CreateProceduralTractorDieselClip()
+        {
+            int sampleRate = 22050;
+            float duration = 0.5f;
+            int totalSamples = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[totalSamples];
+
+            float fundamentalFreq = 26f; // ~26 Hz 3-cylinder agricultural diesel idle chug
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float s1 = Mathf.Sin(2f * Mathf.PI * fundamentalFreq * t);
+                float s2 = 0.5f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 2f * t);
+                float s3 = 0.4f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 3f * t);
+                float pulse = (t % (1f / fundamentalFreq) < 0.006f) ? 0.35f : 0f;
+                float noise = (UnityEngine.Random.value * 2f - 1f) * 0.1f;
+                samples[i] = Mathf.Clamp((s1 + s2 + s3 + pulse + noise) * 0.35f, -1f, 1f);
+            }
+
+            var clip = AudioClip.Create("Synthesized_Tractor_Diesel", totalSamples, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         public override string GetVehicleInfo() => "Tractor";
 
         // ── Hitch API ─────────────────────────────────────────────────────
 
-        /// <summary>Attaches an implement type to the tractor.</summary>
         public void AttachImplement(AttachedImplement type)
         {
             attachedImplement = type;
         }
 
-        /// <summary>Removes the currently attached implement.</summary>
         public void DetachImplement()
         {
             attachedImplement = AttachedImplement.None;
         }
 
-        /// <summary>Sets hitch position. 0 = fully lowered, 1 = fully raised.</summary>
         public void RaiseLowerHitch(float amount)
         {
             hitchPosition = Mathf.Clamp01(amount);
+        }
+
+        public void ToggleHitch()
+        {
+            hitchPosition = (hitchPosition > 0.5f) ? 0f : 1f;
+        }
+
+        public void UpdateHitchArm()
+        {
+            if (hitchArmTransform == null) return;
+            // 0 = lowered (-20 deg into ground/working), 1 = raised (+20 deg transport)
+            float angle = Mathf.Lerp(hitchLiftAngleMin, hitchLiftAngleMax, hitchPosition);
+            hitchArmTransform.localRotation = Quaternion.Euler(angle, 0f, 0f);
         }
 
         // ── PTO ───────────────────────────────────────────────────────────
@@ -220,24 +348,14 @@ namespace HeavyVehiclesWorld.Vehicles
         // ── Throttle / Clutch polling ─────────────────────────────────────
         private void ReadThrottleAndClutch()
         {
-            // Throttle pedal (separate from drive)
             throttlePedal = InputManagerProxy.Throttle;
 
-            // Clutch
 #if ENABLE_INPUT_SYSTEM
             clutchPedal = UnityEngine.InputSystem.Keyboard.current != null
                 && UnityEngine.InputSystem.Keyboard.current.leftCtrlKey.isPressed ? 1f : 0f;
 #else
             clutchPedal = Input.GetKey(KeyCode.LeftControl) ? 1f : 0f;
 #endif
-        }
-
-        // ── Hitch arm visual ─────────────────────────────────────────────
-        private void UpdateHitchArm()
-        {
-            if (hitchArmTransform == null) return;
-            float angle = Mathf.Lerp(hitchLiftAngleMin, hitchLiftAngleMax, hitchPosition);
-            hitchArmTransform.localRotation = Quaternion.Euler(angle, 0f, 0f);
         }
 
         // ── Wheel mesh sync ───────────────────────────────────────────────
@@ -267,6 +385,16 @@ namespace HeavyVehiclesWorld.Vehicles
             else if (hornSource != null && hornSource.isPlaying)
             {
                 hornSource.Stop();
+            }
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            float impactForce = collision.relativeVelocity.magnitude;
+            if (impactForce > 3.5f)
+            {
+                float dmg = (impactForce - 3.5f) * 1.5f;
+                damageLevel = Mathf.Clamp(damageLevel + dmg, 0f, 100f);
             }
         }
 

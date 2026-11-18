@@ -201,7 +201,7 @@ namespace HeavyVehiclesWorld.Vehicles
             WheelPhysicsHelper.ApplySteering(_steerWheels, steer, steerLimit);
         }
 
-        private void ApplyAntiRoll(WheelCollider left, WheelCollider right)
+        public void ApplyAntiRoll(WheelCollider left, WheelCollider right)
         {
             if (left == null || right == null) return;
 
@@ -224,7 +224,7 @@ namespace HeavyVehiclesWorld.Vehicles
                 rb.AddForceAtPosition(right.transform.up * antiRollForce, right.transform.position);
         }
 
-        private void ApplyAerodynamicDownforce()
+        public void ApplyAerodynamicDownforce()
         {
             if (rb == null) return;
             // Downforce proportional to square of velocity: keeps car grounded firmly at speed

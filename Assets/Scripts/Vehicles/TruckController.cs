@@ -6,7 +6,7 @@ namespace HeavyVehiclesWorld.Vehicles
     /// <summary>
     /// Heavy truck controller with tipper bed and trailer hitch.
     /// Inherits VehicleController. Uses WheelPhysicsHelper for WheelCollider physics.
-    /// Mass: 8000 kg (vs 1500 kg for car). Air-brake feel via progressive build-up.
+    /// Mass: 8000 kg. Air-brake feel via progressive build-up and dual sway-bar anti-roll.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     [RequireComponent(typeof(AudioSource))]
@@ -26,12 +26,19 @@ namespace HeavyVehiclesWorld.Vehicles
         public Transform rearLeftMesh;
         public Transform rearRightMesh;
 
+        // ── Suspension & Stability ────────────────────────────────────────
+        [Header("Suspension & Stability")]
+        public float antiRollStiffness = 15000f;
+        public float downforceCoefficient = 4.0f;
+        public float steerSensitivity = 6.0f;
+        private float _currentSmoothedSteer;
+
         // ── Tuning ────────────────────────────────────────────────────────
         [Header("Truck Tuning")]
-        public float maxSteerAngle   = 25f;
-        public float motorTorque     = 6000f;
-        public float maxBrakeTorque  = 12000f;
-        public float handBrakeTorque = 15000f;
+        public float maxSteerAngle   = 28f;
+        public float motorTorque     = 7000f;
+        public float maxBrakeTorque  = 16000f;
+        public float handBrakeTorque = 20000f;
         public float idleRPM         = 600f;
 
         // ── Gearbox ───────────────────────────────────────────────────────
@@ -57,6 +64,7 @@ namespace HeavyVehiclesWorld.Vehicles
         public Transform tipperBed;
         public bool      isDumping;
         public float     tipperAngle;    // degrees: 0 = flat, 60 = fully raised
+        [SerializeField] private float tipperSpeed = 20f;
 
         // ── Payload ───────────────────────────────────────────────────────
         [Header("Cargo Payload")]
@@ -68,7 +76,6 @@ namespace HeavyVehiclesWorld.Vehicles
             currentPayload = Mathf.Clamp(currentPayload + amount, 0f, maxPayload);
             Debug.Log($"[TruckController] Added payload: {amount:F1}. Total: {currentPayload:F1}/{maxPayload:F1}");
         }
-        [SerializeField] private float tipperSpeed = 15f;
 
         // ── Lights ────────────────────────────────────────────────────────
         [Header("Headlights")]
@@ -83,7 +90,7 @@ namespace HeavyVehiclesWorld.Vehicles
 
         // ── Air-brake state ───────────────────────────────────────────────
         private float _currentBrakeTorque;
-        private float _airBrakeBuildRate = 2000f;  // torque units / second
+        private float _airBrakeBuildRate = 16000f;  // Fast pneumatic build-up (0.75s to full lock)
 
         // ── Internal ──────────────────────────────────────────────────────
         private WheelCollider[] _driveWheels;
@@ -96,10 +103,15 @@ namespace HeavyVehiclesWorld.Vehicles
             base.Start();
             maxRPM = 3000f;
             rb.mass = 8000f;
-            rb.centerOfMass = new Vector3(0f, -0.8f, 0.5f);
+            rb.centerOfMass = new Vector3(0f, -0.6f, 0.4f);
 
             _driveWheels = new[] { rearLeft, rearRight };
             _steerWheels = new[] { frontLeft, frontRight };
+
+            ConfigureWheelFriction(frontLeft);
+            ConfigureWheelFriction(frontRight);
+            ConfigureWheelFriction(rearLeft);
+            ConfigureWheelFriction(rearRight);
         }
 
         private void FixedUpdate()
@@ -107,6 +119,9 @@ namespace HeavyVehiclesWorld.Vehicles
             if (!engineRunning) return;
             ApplyDriving();
             ApplySteering();
+            ApplyAntiRoll(frontLeft, frontRight);
+            ApplyAntiRoll(rearLeft, rearRight);
+            ApplyAerodynamicDownforce();
             SyncWheelMeshes();
             AutoShift();
             UpdateTipperBed();
@@ -116,6 +131,7 @@ namespace HeavyVehiclesWorld.Vehicles
         protected override void Update()
         {
             base.Update();
+            UpdateEngineSound();
             HandleExtras();
         }
 
@@ -173,7 +189,7 @@ namespace HeavyVehiclesWorld.Vehicles
                 new[] { frontLeft, frontRight, rearLeft, rearRight },
                 _currentBrakeTorque);
 
-            // Handbrake (rear only)
+            // Handbrake (rear dual wheels locked)
             if (InputManagerProxy.HandBrake > 0.5f)
             {
                 if (rearLeft != null) rearLeft.brakeTorque = handBrakeTorque;
@@ -185,22 +201,114 @@ namespace HeavyVehiclesWorld.Vehicles
 
         public override void ApplySteering()
         {
-            float steer = InputManagerProxy.Steer;
-            WheelPhysicsHelper.ApplySteering(_steerWheels, steer, maxSteerAngle);
+            float targetSteer = InputManagerProxy.Steer;
+            _currentSmoothedSteer = Mathf.Lerp(_currentSmoothedSteer, targetSteer, Time.fixedDeltaTime * steerSensitivity);
+
+            float speedKmh = rb != null ? rb.linearVelocity.magnitude * 3.6f : 0f;
+            float speedFactor = Mathf.Clamp01(speedKmh / 90f);
+            float effectiveSteerAngle = Mathf.Lerp(maxSteerAngle, 12f, speedFactor);
+
+            if (frontLeft != null) frontLeft.steerAngle = _currentSmoothedSteer * effectiveSteerAngle;
+            if (frontRight != null) frontRight.steerAngle = _currentSmoothedSteer * effectiveSteerAngle;
+        }
+
+        public void ApplyAntiRoll(WheelCollider left, WheelCollider right)
+        {
+            if (left == null || right == null || rb == null) return;
+
+            float travelL = 1.0f;
+            float travelR = 1.0f;
+
+            bool groundedL = left.GetGroundHit(out WheelHit hitL);
+            if (groundedL)
+                travelL = (-left.transform.InverseTransformPoint(hitL.point).y - left.radius) / left.suspensionDistance;
+
+            bool groundedR = right.GetGroundHit(out WheelHit hitR);
+            if (groundedR)
+                travelR = (-right.transform.InverseTransformPoint(hitR.point).y - right.radius) / right.suspensionDistance;
+
+            float antiRollForce = (travelL - travelR) * antiRollStiffness;
+
+            if (groundedL)
+                rb.AddForceAtPosition(left.transform.up * -antiRollForce, left.transform.position);
+            if (groundedR)
+                rb.AddForceAtPosition(right.transform.up * antiRollForce, right.transform.position);
+        }
+
+        public void ApplyAerodynamicDownforce()
+        {
+            if (rb == null) return;
+            rb.AddForce(-transform.up * downforceCoefficient * rb.linearVelocity.sqrMagnitude);
+        }
+
+        private void ConfigureWheelFriction(WheelCollider wc)
+        {
+            if (wc == null) return;
+
+            WheelFrictionCurve fwd = wc.forwardFriction;
+            fwd.extremumSlip = 0.45f;
+            fwd.extremumValue = 1.0f;
+            fwd.asymptoteSlip = 0.85f;
+            fwd.asymptoteValue = 0.75f;
+            fwd.stiffness = 1.6f;
+            wc.forwardFriction = fwd;
+
+            WheelFrictionCurve side = wc.sidewaysFriction;
+            side.extremumSlip = 0.40f;
+            side.extremumValue = 1.0f;
+            side.asymptoteSlip = 0.70f;
+            side.asymptoteValue = 0.85f;
+            side.stiffness = 1.8f;
+            wc.sidewaysFriction = side;
         }
 
         public override void UpdateEngineSound()
         {
             if (engineAudioSource == null) return;
-            if (!engineAudioSource.isPlaying) engineAudioSource.Play();
-            engineAudioSource.pitch = 0.5f + (engineRPM / maxRPM) * 1.5f;
+            if (engineAudioSource.clip == null)
+            {
+                engineAudioSource.clip = CreateProceduralTruckDieselClip();
+            }
+
+            if (!engineAudioSource.isPlaying)
+            {
+                engineAudioSource.loop = true;
+                engineAudioSource.Play();
+            }
+
+            float rpmRatio = Mathf.Clamp01(engineRPM / maxRPM);
+            engineAudioSource.pitch = Mathf.Lerp(0.65f, 1.85f, rpmRatio);
+            engineAudioSource.volume = Mathf.Lerp(0.40f, 0.90f, 0.4f + 0.6f * Mathf.Abs(InputManagerProxy.Throttle));
+        }
+
+        public static AudioClip CreateProceduralTruckDieselClip()
+        {
+            int sampleRate = 22050;
+            float duration = 0.5f;
+            int totalSamples = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[totalSamples];
+
+            float fundamentalFreq = 32f; // ~32 Hz heavy 6-cylinder diesel idle
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float s1 = Mathf.Sin(2f * Mathf.PI * fundamentalFreq * t);
+                float s2 = 0.6f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 2f * t);
+                float s3 = 0.35f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 3f * t);
+                float s4 = 0.2f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 6f * t);
+                float noise = (UnityEngine.Random.value * 2f - 1f) * 0.12f;
+                samples[i] = Mathf.Clamp((s1 + s2 + s3 + s4 + noise) * 0.35f, -1f, 1f);
+            }
+
+            var clip = AudioClip.Create("Synthesized_Truck_Diesel", totalSamples, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
 
         public override string GetVehicleInfo() => "Truck";
 
         // ── Trailer API ───────────────────────────────────────────────────
 
-        /// <summary>Attaches a trailer to this truck's hitch point.</summary>
         public void AttachTrailer(TrailerController t)
         {
             if (t == null || isTrailerAttached) return;
@@ -209,7 +317,6 @@ namespace HeavyVehiclesWorld.Vehicles
             t.AttachToTruck(trailerHitchPoint);
         }
 
-        /// <summary>Detaches the currently coupled trailer.</summary>
         public void DetachTrailer()
         {
             if (!isTrailerAttached || attachedTrailer == null) return;
@@ -222,14 +329,21 @@ namespace HeavyVehiclesWorld.Vehicles
 
         public void StartDumping() => isDumping = true;
         public void StopDumping()  => isDumping = false;
+        public void ToggleDumping() => isDumping = !isDumping;
 
-        private void UpdateTipperBed()
+        public void UpdateTipperBed()
         {
             if (tipperBed == null) return;
 
             float target = isDumping ? 60f : 0f;
             tipperAngle = Mathf.MoveTowards(tipperAngle, target, tipperSpeed * Time.fixedDeltaTime);
             tipperBed.localRotation = Quaternion.Euler(tipperAngle, 0f, 0f);
+
+            // Unload cargo payload when bed is tilted beyond 25 degrees
+            if (tipperAngle > 25f && currentPayload > 0f)
+            {
+                currentPayload = Mathf.MoveTowards(currentPayload, 0f, 6000f * Time.fixedDeltaTime);
+            }
         }
 
         // ── Auto-shift ────────────────────────────────────────────────────
@@ -277,6 +391,16 @@ namespace HeavyVehiclesWorld.Vehicles
             else if (hornSource != null && hornSource.isPlaying)
             {
                 hornSource.Stop();
+            }
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            float impactForce = collision.relativeVelocity.magnitude;
+            if (impactForce > 4.0f)
+            {
+                float dmg = (impactForce - 4.0f) * 1.8f;
+                damageLevel = Mathf.Clamp(damageLevel + dmg, 0f, 100f);
             }
         }
 

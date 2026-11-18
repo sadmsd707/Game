@@ -1,4 +1,5 @@
 using UnityEngine;
+using HeavyVehiclesWorld.Vehicles;
 
 namespace HeavyVehiclesWorld.Systems
 {
@@ -86,7 +87,33 @@ namespace HeavyVehiclesWorld.Systems
 
                 case ViewMode.ThirdPerson:
                 default:
-                    rawPos = target.position - target.forward * 6.8f + Vector3.up * 2.8f;
+                    float followDist = 6.8f;
+                    float followHeight = 2.8f;
+                    var vc = target.GetComponent<VehicleController>();
+                    if (vc != null)
+                    {
+                        if (vc.vehicleType == VehicleType.Truck)
+                        {
+                            followDist = 8.8f;
+                            followHeight = 3.6f;
+                        }
+                        else if (vc.vehicleType == VehicleType.Tractor)
+                        {
+                            followDist = 7.2f;
+                            followHeight = 2.9f;
+                        }
+                        else if (vc.vehicleType == VehicleType.Harvester)
+                        {
+                            followDist = 8.5f;
+                            followHeight = 3.4f;
+                        }
+                        else if (vc.vehicleType == VehicleType.Excavator || vc.vehicleType == VehicleType.JCB)
+                        {
+                            followDist = 7.8f;
+                            followHeight = 3.2f;
+                        }
+                    }
+                    rawPos = target.position - target.forward * followDist + Vector3.up * followHeight;
                     // Obstacle occlusion avoidance (prevents camera clipping into trees, crates, walls)
                     Vector3 origin = target.position + Vector3.up * 1.4f;
                     Vector3 rayDir = rawPos - origin;

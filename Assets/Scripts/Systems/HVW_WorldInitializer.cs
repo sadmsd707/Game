@@ -25,6 +25,8 @@ namespace HeavyVehiclesWorld.Systems
         private Text _speedometerText;
         private Text _gearText;
         private Text _vehicleNameText;
+        private GameObject _actionButtonGo;
+        private Text _actionButtonLabel;
 
         private bool _steerLeftHeld;
         private bool _steerRightHeld;
@@ -543,11 +545,24 @@ namespace HeavyVehiclesWorld.Systems
                     hitchPivot.transform.SetParent(placeholderGo.transform, false);
                     hitchPivot.transform.localPosition = new Vector3(0f, 0.45f, -bodySize.z * 0.48f);
                     CreateBox("Hitch_Bar", hitchPivot.transform, new Vector3(0f, 0f, -0.35f), new Vector3(0.8f, 0.15f, 0.7f), steelMat);
+
+                    // Working Plough Implement attached to Hitch
+                    var ploughGo = new GameObject("Plough_Assembly");
+                    ploughGo.transform.SetParent(hitchPivot.transform, false);
+                    ploughGo.transform.localPosition = new Vector3(0f, 0f, -0.55f);
+                    CreateBox("Plough_Beam", ploughGo.transform, new Vector3(0f, 0.05f, -0.35f), new Vector3(1.2f, 0.12f, 0.7f), steelMat);
+                    for (int p = -1; p <= 1; p++)
+                    {
+                        CreateBox($"Plough_Blade_{p + 2}", ploughGo.transform, new Vector3(p * 0.42f, -0.28f, -0.35f - p * 0.15f), new Vector3(0.12f, 0.45f, 0.32f), steelMat);
+                    }
+
                     slot.threePointHitch = hitchPivot.transform;
                     if (ctrl is TractorController tc)
                     {
                         tc.rearHitch = hitchPivot.transform;
                         tc.hitchArmTransform = hitchPivot.transform;
+                        var ploughComp = ploughGo.AddComponent<PloughImplement>();
+                        ploughComp.AttachToTractor(tc);
                     }
                     break;
 
@@ -822,6 +837,13 @@ namespace HeavyVehiclesWorld.Systems
                 () => { _handbrakeHeld = true; },
                 () => { _handbrakeHeld = false; });
 
+            // Vehicle Action Button (Dump Bed / Plough / Header)
+            _actionButtonGo = CreateClickButton(canvasGo, "Btn_VehicleAction", "ACTION",
+                new Vector2(1f, 0f), new Vector2(-130f, 290f), new Vector2(140f, 65f),
+                new Color(0.92f, 0.45f, 0.12f, 0.92f),
+                () => { TriggerVehicleAction(); });
+            _actionButtonLabel = _actionButtonGo.GetComponentInChildren<Text>();
+
             // ── Top Toolbar: Vehicle Switcher ────────────────────────────────
             var vehicleDefs = new (string label, VehicleType type)[]
             {
@@ -928,7 +950,7 @@ namespace HeavyVehiclesWorld.Systems
             trigger.triggers.Add(entryUp);
         }
 
-        private void CreateClickButton(GameObject parent, string name, string label, Vector2 anchor, Vector2 pos, Vector2 size, Color col, System.Action onClick)
+        private GameObject CreateClickButton(GameObject parent, string name, string label, Vector2 anchor, Vector2 pos, Vector2 size, Color col, System.Action onClick)
         {
             var btnGo = new GameObject(name);
             btnGo.transform.SetParent(parent.transform, false);
@@ -960,6 +982,8 @@ namespace HeavyVehiclesWorld.Systems
             t.color = Color.white;
             t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (t.font == null) t.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+            return btnGo;
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -1057,6 +1081,56 @@ namespace HeavyVehiclesWorld.Systems
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.SwitchVehicle(_activeVehicle);
+            }
+
+            UpdateActionUI();
+        }
+
+        private void TriggerVehicleAction()
+        {
+            if (_activeVehicle == null) return;
+            if (_activeVehicle is TruckController tk)
+            {
+                tk.ToggleDumping();
+                UpdateActionUI();
+            }
+            else if (_activeVehicle is TractorController tc)
+            {
+                tc.ToggleHitch();
+                UpdateActionUI();
+            }
+            else if (_activeVehicle is HarvesterController hc)
+            {
+                hc.RaiseLowerHeader(!hc.headerLowered);
+                UpdateActionUI();
+            }
+        }
+
+        private void UpdateActionUI()
+        {
+            if (_actionButtonGo == null || _activeVehicle == null) return;
+
+            if (_activeVehicle is TruckController tk)
+            {
+                _actionButtonGo.SetActive(true);
+                if (_actionButtonLabel != null)
+                    _actionButtonLabel.text = tk.isDumping ? "🚛 LOWER\nBED" : "🚛 DUMP\nBED";
+            }
+            else if (_activeVehicle is TractorController tc)
+            {
+                _actionButtonGo.SetActive(true);
+                if (_actionButtonLabel != null)
+                    _actionButtonLabel.text = (tc.hitchPosition < 0.5f) ? "🚜 RAISE\nPLOUGH" : "🚜 LOWER\nPLOUGH";
+            }
+            else if (_activeVehicle is HarvesterController hc)
+            {
+                _actionButtonGo.SetActive(true);
+                if (_actionButtonLabel != null)
+                    _actionButtonLabel.text = hc.headerLowered ? "🌾 RAISE\nHEADER" : "🌾 LOWER\nHEADER";
+            }
+            else
+            {
+                _actionButtonGo.SetActive(false);
             }
         }
 

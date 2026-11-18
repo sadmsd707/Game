@@ -828,3 +828,89 @@ Step 1 required perfecting the Car before touching any other vehicle or system: 
 
 **Related to:** Step 1 Car Only, Anti-Roll Suspension, Speed Steering, Auto-Reverse, Handbrake, Engine Audio Synthesis, Third-Person Camera Occlusion, Collision Detection
 ---
+
+
+### Change #31 | 2026-11-19 03:30
+**Files changed:**
+- Assets/Scripts/Vehicles/TruckController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/TractorController.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_FollowCamera.cs (MODIFIED)
+- Assets/Scripts/Vehicles/CarController.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+
+**What changed:**
+- Perfected Truck physics, controls, and tipper bed dumping (Step 2A):
+  - Heavy suspension anti-roll bars (`antiRollStiffness = 15000f`) added in `ApplyAntiRoll()` to eliminate rollover and tipping when steering an 8-ton truck.
+  - Aerodynamic downforce (`downforceCoefficient = 4.0f`) applied proportional to velocity squared.
+  - Configured high-stiffness wheel friction curves (`stiffness = 1.6f` fwd, `1.8f` side).
+  - Center of mass lowered to `(0f, -0.6f, 0.4f)`.
+  - Speed-sensitive power steering: smooth steering angle interpolated between 28° at low speed and 12° at highway speed.
+  - Fast pneumatic air-brake build rate (`16000f/s`) with `16000f` max brake torque and `20000f` handbrake torque on rear dual wheels.
+  - Seamless auto-reverse engaged when holding brake from stop (`currentGearIndex = 0`).
+  - Working tipper bed: smooth tilting up to 60° via `UpdateTipperBed()`, automated cargo payload discharge when tilted beyond 25°, and lowering back to 0°.
+  - Procedural 6-cylinder heavy diesel rumble synthesis via `CreateProceduralTruckDieselClip()` with idle fundamental at ~32 Hz, dynamic RPM pitch scaling (0.65x–1.85x), and throttle volume modulation.
+  - Added collision impact damage tracking in `OnCollisionEnter`.
+- Perfected Tractor physics, 4WD traction, and 3-point hitch / plough implement (Step 2B):
+  - Agricultural suspension anti-roll bars (`antiRollStiffness = 9000f`) and downforce (`2.0f`).
+  - Off-road wheel friction curves configured (`stiffness = 1.5f`).
+  - Center of mass balanced to `(0f, -0.2f, 0.1f)`.
+  - Tight agricultural steering: up to 40° steer angle at low speed, smoothly clamped to 18° at 50 km/h.
+  - Responsive brakes (`10000f`), handbrake (`15000f`), and auto-reverse transition.
+  - Working 3-Point Hitch & Plough Implement:
+    - Attached a 3-share steel plough assembly to `hitchPivot` with `PloughImplement` component.
+    - Hitch rotates between -20° (working soil depth) and +20° (transport clearance) via `RaiseLowerHitch()` and `ToggleHitch()`.
+  - Procedural 3-cylinder agricultural diesel audio synthesis via `CreateProceduralTractorDieselClip()` with rhythmic ~26 Hz idle chug, dynamic RPM pitch scaling (0.70x–1.90x), and volume modulation.
+  - Added collision impact damage tracking in `OnCollisionEnter`.
+- Upgraded Mobile HUD & Camera System:
+  - Added dynamic Vehicle Action button (`Btn_VehicleAction`) to touch HUD that automatically toggles `"🚛 DUMP / LOWER BED"` for Truck and `"🚜 LOWER / RAISE PLOUGH"` for Tractor.
+  - Upgraded `HVW_FollowCamera.cs` to dynamically adjust third-person follow distance and height according to vehicle dimensions (Truck: 8.8m / 3.6m; Tractor: 7.2m / 2.9m).
+- Expanded Play-Mode Recovery Test Suite:
+  - Added dedicated test blocks `STEP 2A: TRUCK ONLY VERIFICATION` and `STEP 2B: TRACTOR ONLY VERIFICATION`.
+  - Verified acceleration, anti-roll stability (upright dot product: 1.00), service braking to complete stop, auto-reverse drive, handbrake locking, tipper bed tilt & payload discharge, 3-point hitch raise/lower angles, attached plough presence, procedural diesel audio synthesis, and camera framing.
+
+**New code:**
+```csharp
+// TruckController.cs - Tipper bed raising and automated payload discharge
+public void UpdateTipperBed()
+{
+    if (tipperBed == null) return;
+    float target = isDumping ? 60f : 0f;
+    tipperAngle = Mathf.MoveTowards(tipperAngle, target, tipperSpeed * Time.fixedDeltaTime);
+    tipperBed.localRotation = Quaternion.Euler(tipperAngle, 0f, 0f);
+
+    if (tipperAngle > 25f && currentPayload > 0f)
+    {
+        currentPayload = Mathf.MoveTowards(currentPayload, 0f, 6000f * Time.fixedDeltaTime);
+    }
+}
+
+// TractorController.cs - 3-Point hitch rotation and Plough toggle
+public void ToggleHitch()
+{
+    hitchPosition = (hitchPosition > 0.5f) ? 0f : 1f;
+}
+
+public void UpdateHitchArm()
+{
+    if (hitchArmTransform == null) return;
+    float angle = Mathf.Lerp(hitchLiftAngleMin, hitchLiftAngleMax, hitchPosition);
+    hitchArmTransform.localRotation = Quaternion.Euler(angle, 0f, 0f);
+}
+```
+
+**Why:**
+Step 2 required perfecting the Truck (tipper bed works, payload dumps, heavy anti-roll, progressive air-brakes, auto-reverse, diesel sound) and Tractor (3-point hitch and plough lowers/raises, 4WD traction, tight steering, agricultural diesel sound) according to the same strict stability and physics rules as Step 1.
+
+*Previous code:*
+```csharp
+// TruckController previously had no anti-roll sway bars, lacked aerodynamic downforce,
+// had slow air-brake ramp (2000f/sec taking 6s to stop), no procedural diesel sound fallback,
+// and did not discharge payload when dumped.
+// TractorController had no anti-roll sway bars, no working plough implement attached to its hitch,
+// and no procedural audio synthesis.
+// HUD had no on-screen button to trigger tipper dumping or hitch/plough lifting.
+```
+
+**Related to:** Step 2 Truck and Tractor, Tipper Bed Dumping, Cargo Payload, 3-Point Hitch, Working Plough Implement, Anti-Roll Suspension, Progressive Air Brakes, Procedural Diesel Audio, Mobile Action HUD
+---
