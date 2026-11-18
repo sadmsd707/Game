@@ -39,7 +39,6 @@ namespace HeavyVehiclesWorld.Vehicles
         public float maxSteerAngle   = 40f;
         public float motorTorque     = 3000f;
         public float maxBrakeTorque  = 8000f;
-        public float maxRPM          = 2200f;
         public float idleRPM         = 600f;
 
         // ── Gearbox ───────────────────────────────────────────────────────
@@ -93,6 +92,7 @@ namespace HeavyVehiclesWorld.Vehicles
         protected override void Start()
         {
             base.Start();
+            maxRPM = 2200f;
             rb.mass = 4000f;
             rb.centerOfMass = new Vector3(0f, -0.4f, -0.3f);
         }
@@ -108,7 +108,7 @@ namespace HeavyVehiclesWorld.Vehicles
             ConsumeFuel();
         }
 
-        private void Update()
+        protected override void Update()
         {
             base.Update();
             UpdateHitchArm();

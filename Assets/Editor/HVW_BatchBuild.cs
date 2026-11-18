@@ -44,14 +44,40 @@ public static class HVW_BatchBuild
             return;
         }
 
-        // 1. Configure Android Paths
-        string sdkPath = "C:/Users/Shivraj Deshmukh/AppData/Local/Android/Sdk";
-        string ndkPath = "C:/Users/Shivraj Deshmukh/AppData/Local/Android/Sdk/ndk/26.3.11579264";
-        string jdkPath = "C:/Program Files/Microsoft/jdk-17.0.20.101-hotspot";
+        // 1. Configure Android Paths (Prefer Unity's officially bundled SDK, NDK, and OpenJDK)
+        string unityData = @"C:/Program Files/Unity/Hub/Editor/6000.6.9f1/Editor/Data/PlaybackEngines/AndroidPlayer";
+        string bundledSdk = Path.Combine(unityData, "SDK").Replace('\\', '/');
+        string bundledNdk = Path.Combine(unityData, "NDK").Replace('\\', '/');
+        string bundledJdk = Path.Combine(unityData, "OpenJDK").Replace('\\', '/');
 
-        if (Directory.Exists(sdkPath)) EditorPrefs.SetString("AndroidSdkRoot", sdkPath);
-        if (Directory.Exists(ndkPath)) EditorPrefs.SetString("AndroidNdkRootR26b", ndkPath);
-        if (Directory.Exists(jdkPath)) EditorPrefs.SetString("JdkPath", jdkPath);
+        if (Directory.Exists(bundledSdk))
+        {
+            EditorPrefs.SetBool("SdkUseEmbedded", true);
+            EditorPrefs.SetString("AndroidSdkRoot", bundledSdk);
+        }
+        else
+        {
+            string extSdk = "C:/Users/Shivraj Deshmukh/AppData/Local/Android/Sdk";
+            if (Directory.Exists(extSdk)) EditorPrefs.SetString("AndroidSdkRoot", extSdk);
+        }
+
+        if (Directory.Exists(bundledNdk))
+        {
+            EditorPrefs.SetBool("NdkUseEmbedded", true);
+            EditorPrefs.SetString("AndroidNdkRootR27c", bundledNdk);
+            EditorPrefs.SetString("AndroidNdkRoot", bundledNdk);
+        }
+
+        if (Directory.Exists(bundledJdk))
+        {
+            EditorPrefs.SetBool("JdkUseEmbedded", true);
+            EditorPrefs.SetString("JdkPath", bundledJdk);
+        }
+        else
+        {
+            string extJdk = "C:/Program Files/Microsoft/jdk-17.0.20.101-hotspot";
+            if (Directory.Exists(extJdk)) EditorPrefs.SetString("JdkPath", extJdk);
+        }
 
         // 2. Configure Android Player Settings for Production
         PlayerSettings.companyName = "Shivraj Deshmukh";

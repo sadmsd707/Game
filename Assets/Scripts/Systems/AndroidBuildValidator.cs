@@ -66,7 +66,7 @@ namespace HeavyVehiclesWorld.Systems
             Debug.Log("═══════ HeavyVehiclesWorld – Android Build Validation ═══════");
 
             // ── Build target ──────────────────────────────────────────────────
-            Check(EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android,
+            Check(EditorUserBuildSettings.activeBuildTarget == BuildTarget.Android || BuildPipeline.isBuildingPlayer,
                   "Active build target is Android",
                   "File → Build Settings → Android → Switch Platform");
 

@@ -15,7 +15,7 @@ set UNITY_EXE=C:\Program Files\Unity\Hub\Editor\6000.6.9f1\Editor\Unity.exe
 set PROJECT_DIR=%~dp0
 if "%PROJECT_DIR:~-1%"=="\" set PROJECT_DIR=%PROJECT_DIR:~0,-1%
 
-"%UNITY_EXE%" -batchmode -quit -projectPath "%PROJECT_DIR%" -licensingIpc "LicenseClient-Shivraj Deshmukh" -executeMethod HVW_BatchBuild.BuildProductionAPK -logFile "%PROJECT_DIR%\Logs\apk_build.log"
+"%UNITY_EXE%" -batchmode -quit -projectPath "%PROJECT_DIR%" -acceptSoftwareTermsForThisRunOnly -licensingIpc "LicenseClient-Shivraj Deshmukh" -executeMethod HVW_BatchBuild.BuildProductionAPK -logFile "%PROJECT_DIR%\Logs\apk_build.log"
 
 if %ERRORLEVEL% EQU 0 (
     echo.

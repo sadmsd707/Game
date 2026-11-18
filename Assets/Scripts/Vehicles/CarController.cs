@@ -32,7 +32,6 @@ namespace HeavyVehiclesWorld.Vehicles
         public float motorTorque     = 1500f;
         public float brakeTorque     = 5000f;
         public float handBrakeTorque = 10000f;
-        public float maxRPM          = 7000f;
         public float idleRPM         = 800f;
 
         // ── Gear ratios: index 0=R, 1=N, 2=D1 ... 6=D5 ───────────────────
@@ -70,6 +69,7 @@ namespace HeavyVehiclesWorld.Vehicles
         protected override void Start()
         {
             base.Start();
+            maxRPM = 7000f;
 
             rb.mass = 1500f;
             rb.centerOfMass = new Vector3(0f, -0.5f, 0.3f);
@@ -89,7 +89,7 @@ namespace HeavyVehiclesWorld.Vehicles
             ConsumeFuel();
         }
 
-        private void Update()
+        protected override void Update()
         {
             base.Update();
             HandleExtras();
