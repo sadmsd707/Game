@@ -73,18 +73,34 @@ namespace HeavyVehiclesWorld.Systems
         {
             if (target == null) return transform.position;
 
+            Vector3 rawPos;
             switch (currentMode)
             {
                 case ViewMode.Cockpit:
-                    return target.position + target.forward * 0.5f + Vector3.up * 1.5f;
+                    rawPos = target.position + target.forward * 0.5f + Vector3.up * 1.5f;
+                    break;
 
                 case ViewMode.Drone:
-                    return target.position + Vector3.up * 20f - target.forward * 4f;
+                    rawPos = target.position + Vector3.up * 20f - target.forward * 4f;
+                    break;
 
                 case ViewMode.ThirdPerson:
                 default:
-                    return target.position - target.forward * 7.5f + Vector3.up * 3.6f;
+                    rawPos = target.position - target.forward * 6.8f + Vector3.up * 2.8f;
+                    // Obstacle occlusion avoidance (prevents camera clipping into trees, crates, walls)
+                    Vector3 origin = target.position + Vector3.up * 1.4f;
+                    Vector3 rayDir = rawPos - origin;
+                    float dist = rayDir.magnitude;
+                    if (Physics.SphereCast(origin, 0.25f, rayDir.normalized, out RaycastHit hit, dist, ~0, QueryTriggerInteraction.Ignore))
+                    {
+                        if (hit.transform != target && !hit.transform.IsChildOf(target))
+                        {
+                            rawPos = origin + rayDir.normalized * Mathf.Max(hit.distance - 0.25f, 1.8f);
+                        }
+                    }
+                    break;
             }
+            return rawPos;
         }
 
         private Vector3 GetLookTarget()
@@ -101,7 +117,7 @@ namespace HeavyVehiclesWorld.Systems
 
                 case ViewMode.ThirdPerson:
                 default:
-                    return target.position + Vector3.up * 1.3f + target.forward * 2f;
+                    return target.position + Vector3.up * 1.2f + target.forward * 1.8f;
             }
         }
     }

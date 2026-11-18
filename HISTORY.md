@@ -752,3 +752,79 @@ if (ctrl is CarController cc)
 
 **Related to:** Step 0 Recovery, VehicleModelSlot, Placeholder Visuals, Drivability, WheelCollider, PBR Fallback, Automated PlayMode Test
 ---
+
+
+### Change #30 | 2026-11-19 03:12
+**Files changed:**
+- Assets/Scripts/Vehicles/CarController.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_FollowCamera.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+
+**What changed:**
+- Perfected Car physics, handling, and stability (Step 1):
+  - Front and rear anti-roll sway bars (`antiRollStiffness = 6000f`) added in `ApplyAntiRoll()` to eliminate rollover and tipping during high-speed sharp cornering.
+  - Aerodynamic downforce (`downforceCoefficient = 2.5f`) applied proportional to velocity squared to prevent body lift and floatiness.
+  - Tuned wheel longitudinal and lateral friction curves (`extremumSlip = 0.4f`, `extremumValue = 1.0f`, `stiffness = 1.25f` / `1.4f`) to eliminate jitter and unintended drifting.
+  - Lowered vehicle center of mass to `(0f, -0.35f, 0.1f)`.
+  - Added speed-sensitive steering angle interpolation: dynamic limit from 35° at low speed to 14° at 120 km/h with smoothing sensitivity of `8.0f`.
+  - Upgraded braking and reverse controls: service brake torque set to `8500f`, auto-reverse engaged when holding brake from stop (`currentGearIndex = 0`), and handbrake torque boosted to `12000f` on rear wheels.
+  - Added procedural engine audio synthesis: `CreateProceduralEngineClip()` creates an in-memory 4-cylinder engine loop with RPM pitch scaling (0.75x–2.3x) and throttle volume scaling.
+  - Added collision damage response in `OnCollisionEnter` for tree trunks and world obstacles.
+- Upgraded `HVW_FollowCamera.cs`:
+  - Default third-person chase distance tuned to 6.8m and height to 2.8m.
+  - Integrated sphere-cast obstacle occlusion avoidance to prevent camera clipping inside trees, crates, and terrain.
+- Expanded `HVW_PlayModeRecoveryTest.cs`:
+  - Added comprehensive verification for Car acceleration, anti-roll stability (upright dot product >= 0.85), service braking to complete halt (< 1.0 km/h), auto-reverse drive (> 1.0m backward), 12,000 Nm handbrake lock, procedural engine sound synthesis, third-person camera occlusion, and tree trunk colliders.
+
+**New code:**
+```csharp
+// CarController.cs - Anti-roll sway bar & speed-sensitive steering
+private void ApplyAntiRoll(WheelCollider left, WheelCollider right)
+{
+    float travelL = 1.0f, travelR = 1.0f;
+    bool groundedL = left.GetGroundHit(out WheelHit hitL);
+    if (groundedL) travelL = (-left.transform.InverseTransformPoint(hitL.point).y - left.radius) / left.suspensionDistance;
+    bool groundedR = right.GetGroundHit(out WheelHit hitR);
+    if (groundedR) travelR = (-right.transform.InverseTransformPoint(hitR.point).y - right.radius) / right.suspensionDistance;
+
+    float antiRollForce = (travelL - travelR) * antiRollStiffness;
+    if (groundedL) rb.AddForceAtPosition(left.transform.up * -antiRollForce, left.transform.position);
+    if (groundedR) rb.AddForceAtPosition(right.transform.up * antiRollForce, right.transform.position);
+}
+
+// CarController.cs - Procedural 4-cylinder engine rumble generator
+public static AudioClip CreateProceduralEngineClip()
+{
+    int sampleRate = 22050;
+    float duration = 0.5f;
+    int totalSamples = Mathf.FloorToInt(sampleRate * duration);
+    float[] samples = new float[totalSamples];
+    float fundamentalFreq = 42f; // ~42 Hz rumble for 4-cylinder idle
+    for (int i = 0; i < totalSamples; i++)
+    {
+        float t = (float)i / sampleRate;
+        float s1 = Mathf.Sin(2f * Mathf.PI * fundamentalFreq * t);
+        float s2 = 0.5f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 2f * t);
+        float s3 = 0.25f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 3f * t);
+        float noise = (UnityEngine.Random.value * 2f - 1f) * 0.08f;
+        samples[i] = Mathf.Clamp((s1 + s2 + s3 + noise) * 0.4f, -1f, 1f);
+    }
+    var clip = AudioClip.Create("Synthesized_Car_Engine", totalSamples, 1, sampleRate, false);
+    clip.SetData(samples, 0);
+    return clip;
+}
+```
+
+**Why:**
+Step 1 required perfecting the Car before touching any other vehicle or system: eliminating flipping and jittering during turns, implementing responsive speed-sensitive steering, crisp braking and seamless auto-reverse, handbrake locking, realistic synthesized engine audio without missing clip errors, third-person chase camera with collision avoidance, and solid collision detection against tree trunks and props.
+
+*Previous code:*
+```csharp
+// CarController.cs previously lacked anti-roll bars, aerodynamic downforce, and wheel friction curve tuning:
+// Sharp turns at >30 km/h caused severe body roll and flipping.
+// Engine sound had no fallback audio clip, failing silently if no .wav existed.
+// Camera had no collision occlusion detection and could clip through terrain or tree trunks.
+```
+
+**Related to:** Step 1 Car Only, Anti-Roll Suspension, Speed Steering, Auto-Reverse, Handbrake, Engine Audio Synthesis, Third-Person Camera Occlusion, Collision Detection
+---

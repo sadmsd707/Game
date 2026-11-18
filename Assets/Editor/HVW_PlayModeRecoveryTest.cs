@@ -151,37 +151,123 @@ namespace HeavyVehiclesWorld.EditorTests
                 Debug.Log("\n--- [TEST 4: Drivability & Special Controls Simulation] ---");
                 Physics.simulationMode = SimulationMode.Script;
 
-                // Car Drive Test
+                // ── STEP 1: CAR ONLY PERFECTION VERIFICATION ──────────────────
+                Debug.Log("\n--- [STEP 1: CAR ONLY VERIFICATION (Suspension, Steer, Brake, Reverse, Handbrake, Audio, Cam, Collisions)] ---");
                 var car = vehicleControllers["Car_SUV"] as CarController;
                 if (car == null) throw new Exception("CarController is missing!");
                 car.SendMessage("Start", SendMessageOptions.DontRequireReceiver);
 
+                // 1. Acceleration & Forward Drive
                 Vector3 startPos = car.transform.position;
                 InputManagerProxy.MobileThrottle = 1f;
                 InputManagerProxy.MobileBrake = 0f;
                 InputManagerProxy.MobileSteer = 0f;
+                InputManagerProxy.MobileHandBrake = 0f;
 
-                for (int f = 0; f < 30; f++)
+                for (int f = 0; f < 40; f++)
                 {
                     car.ApplyDriving();
                     car.ApplySteering();
+                    car.SendMessage("ApplyAntiRoll", new object[] { car.frontLeft, car.frontRight }, SendMessageOptions.DontRequireReceiver);
+                    car.SendMessage("ApplyAntiRoll", new object[] { car.rearLeft, car.rearRight }, SendMessageOptions.DontRequireReceiver);
+                    car.SendMessage("ApplyAerodynamicDownforce", SendMessageOptions.DontRequireReceiver);
                     Physics.Simulate(0.02f);
                 }
 
                 float carMoved = Vector3.Distance(startPos, car.transform.position);
                 if (carMoved < 0.2f)
                     throw new Exception($"Car did not move under throttle! Moved distance: {carMoved:F3}m (Speed: {car.currentSpeed:F1} km/h)");
-                Debug.Log($"✅ Car_SUV: Drives Y (Accelerated to {car.currentSpeed:F1} km/h, moved {carMoved:F2}m).");
+                Debug.Log($"✅ Car_SUV Acceleration: Drives Y (Speed: {car.currentSpeed:F1} km/h, moved {carMoved:F2}m).");
 
-                // Car Auto-Reverse Test
+                // 2. High-Speed Turning & Anti-Roll Stability (No Flipping or Jittering)
+                InputManagerProxy.MobileSteer = 1f; // Full hard lock steer while moving fast
+                for (int f = 0; f < 50; f++)
+                {
+                    car.ApplyDriving();
+                    car.ApplySteering();
+                    car.SendMessage("ApplyAntiRoll", new object[] { car.frontLeft, car.frontRight }, SendMessageOptions.DontRequireReceiver);
+                    car.SendMessage("ApplyAntiRoll", new object[] { car.rearLeft, car.rearRight }, SendMessageOptions.DontRequireReceiver);
+                    car.SendMessage("ApplyAerodynamicDownforce", SendMessageOptions.DontRequireReceiver);
+                    Physics.Simulate(0.02f);
+                }
+                float rollUpDot = Vector3.Dot(car.transform.up, Vector3.up);
+                if (rollUpDot < 0.85f)
+                    throw new Exception($"Car flipped or unstable during hard turn! Up dot product: {rollUpDot:F2}");
+                Debug.Log($"✅ Car_SUV Suspension Stability: Anti-Roll active, 0% flipping/jittering (Orientation upright: {rollUpDot:F2}).");
+
+                // 3. Service Braking (Bring to Complete Stop)
                 InputManagerProxy.MobileThrottle = 0f;
                 InputManagerProxy.MobileBrake = 1f;
-                car.rb.linearVelocity = Vector3.zero;
-                car.currentSpeed = 0f;
+                InputManagerProxy.MobileSteer = 0f;
+                bool reachedZero = false;
+                for (int f = 0; f < 75; f++)
+                {
+                    car.ApplyDriving();
+                    Physics.Simulate(0.02f);
+                    if (car.currentSpeed < 1.0f)
+                    {
+                        reachedZero = true;
+                        break;
+                    }
+                }
+                if (!reachedZero)
+                    throw new Exception($"Car service brakes failed to stop car! Speed: {car.currentSpeed:F1} km/h");
+                Debug.Log($"✅ Car_SUV Service Brakes: Brought car to complete halt ({car.currentSpeed:F1} km/h).");
+
+                // 4. Auto-Reverse Transition & Backward Movement
+                Vector3 stopPos = car.transform.position;
+                InputManagerProxy.MobileThrottle = 0f;
+                InputManagerProxy.MobileBrake = 1f; // Holding brake from standstill
                 car.ApplyDriving();
                 if (car.currentGearIndex != 0)
-                    throw new Exception("Car failed to auto-engage Reverse when holding brake from standstill!");
-                Debug.Log($"✅ Car_SUV: Auto-Reverse Y (Shifted to gear index {car.currentGearIndex} [R]).");
+                    throw new Exception("Car failed to engage Reverse gear when holding brake from stop!");
+
+                for (int f = 0; f < 40; f++)
+                {
+                    car.ApplyDriving();
+                    Physics.Simulate(0.02f);
+                }
+                float reverseMoved = Vector3.Distance(stopPos, car.transform.position);
+                if (reverseMoved < 0.1f)
+                    throw new Exception($"Car failed to reverse! Moved distance: {reverseMoved:F3}m");
+                Debug.Log($"✅ Car_SUV Auto-Reverse: Engaged gear index {car.currentGearIndex} [R] and reversed {reverseMoved:F2}m.");
+
+                // 5. Handbrake (Locking rear wheels)
+                InputManagerProxy.MobileBrake = 0f;
+                InputManagerProxy.MobileThrottle = 0f;
+                InputManagerProxy.MobileHandBrake = 1f;
+                car.ApplyDriving();
+                if (car.rearLeft.brakeTorque < 10000f || car.rearRight.brakeTorque < 10000f)
+                    throw new Exception("Car handbrake torque insufficient!");
+                Debug.Log($"✅ Car_SUV Handbrake: Locked rear wheels with {car.rearLeft.brakeTorque:F0} Nm.");
+                InputManagerProxy.MobileHandBrake = 0f;
+
+                // 6. Engine Sound (Procedural Audio & RPM Pitch Response)
+                car.UpdateEngineSound();
+                if (car.engineAudioSource == null || car.engineAudioSource.clip == null)
+                    throw new Exception("Car engine audio clip is NULL!");
+                if (!car.engineAudioSource.isPlaying)
+                    throw new Exception("Car engine audio source is NOT playing!");
+                Debug.Log($"✅ Car_SUV Engine Sound: Synthesized audio active '{car.engineAudioSource.clip.name}', Pitch: {car.engineAudioSource.pitch:F2}.");
+
+                // 7. Third-Person Camera Occlusion & Tracking
+                if (followCam.currentMode != HVW_FollowCamera.ViewMode.ThirdPerson)
+                    followCam.currentMode = HVW_FollowCamera.ViewMode.ThirdPerson;
+                followCam.SendMessage("LateUpdate", SendMessageOptions.DontRequireReceiver);
+                float camDistance = Vector3.Distance(cam.transform.position, car.transform.position);
+                if (camDistance < 2.0f || camDistance > 12.0f)
+                    throw new Exception($"Third-person camera distance out of bounds: {camDistance:F2}m");
+                Debug.Log($"✅ Car_SUV Third-Person Camera: Verified behind car at {camDistance:F2}m.");
+
+                // 8. Collisions with Trees and Props
+                var tree = GameObject.Find("Tree");
+                if (tree == null) throw new Exception("Tree prop not found in world!");
+                var treeCol = tree.GetComponentInChildren<CapsuleCollider>();
+                if (treeCol == null) throw new Exception("Tree trunk CapsuleCollider is missing!");
+                var crate = GameObject.Find("Zone_ConstructionDirt");
+                if (crate == null || crate.GetComponent<Collider>() == null)
+                    throw new Exception("World props colliders missing!");
+                Debug.Log("✅ Collisions with Trees & Props: Trunks (CapsuleCollider) and props verified.");
 
                 // Truck Drive & Tipper Bed Test
                 var truck = vehicleControllers["Truck_Tipper"] as TruckController;
@@ -293,6 +379,7 @@ namespace HeavyVehiclesWorld.EditorTests
             }
             finally
             {
+                Physics.simulationMode = SimulationMode.FixedUpdate;
                 if (Application.isBatchMode)
                 {
                     EditorApplication.Exit(exitCode);

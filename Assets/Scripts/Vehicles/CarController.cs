@@ -29,10 +29,18 @@ namespace HeavyVehiclesWorld.Vehicles
         // ── Vehicle tuning ────────────────────────────────────────────────
         [Header("Tuning")]
         public float maxSteerAngle   = 35f;
-        public float motorTorque     = 1500f;
-        public float brakeTorque     = 5000f;
-        public float handBrakeTorque = 10000f;
+        public float motorTorque     = 2800f;
+        public float brakeTorque     = 8500f;
+        public float handBrakeTorque = 12000f;
         public float idleRPM         = 800f;
+
+        [Header("Stability & Suspension (Anti-Roll & Downforce)")]
+        [Tooltip("Prevents body rollover and flipping during high-speed sharp turns.")]
+        public float antiRollStiffness = 6000f;
+        [Tooltip("Aerodynamic downforce to keep vehicle firmly planted on the road at high speeds.")]
+        public float downforceCoefficient = 2.5f;
+        [Tooltip("Rate at which steering input interpolates to prevent sudden twitching.")]
+        public float steerSensitivity = 8.0f;
 
         // ── Gear ratios: index 0=R, 1=N, 2=D1 ... 6=D5 ───────────────────
         [Header("Gearbox")]
@@ -64,6 +72,7 @@ namespace HeavyVehiclesWorld.Vehicles
         private float           _brakeInput;
         private float           _handBrakeInput;
         private float           _autoShiftCooldown;
+        private float           _smoothedSteer;
 
         // ── Lifecycle ─────────────────────────────────────────────────────
         protected override void Start()
@@ -72,11 +81,17 @@ namespace HeavyVehiclesWorld.Vehicles
             maxRPM = 7000f;
 
             rb.mass = 1500f;
-            rb.centerOfMass = new Vector3(0f, -0.5f, 0.3f);
+            // Low centre of mass to prevent rollovers and flipping
+            rb.centerOfMass = new Vector3(0f, -0.35f, 0.1f);
 
             _driveWheels = new[] { rearLeft, rearRight };
             _steerWheels = new[] { frontLeft, frontRight };
             _allWheels   = new[] { frontLeft, frontRight, rearLeft, rearRight };
+
+            ConfigureWheelFriction(frontLeft);
+            ConfigureWheelFriction(frontRight);
+            ConfigureWheelFriction(rearLeft);
+            ConfigureWheelFriction(rearRight);
         }
 
         private void FixedUpdate()
@@ -84,6 +99,9 @@ namespace HeavyVehiclesWorld.Vehicles
             if (!engineRunning) return;
             ApplyDriving();
             ApplySteering();
+            ApplyAntiRoll(frontLeft, frontRight);
+            ApplyAntiRoll(rearLeft, rearRight);
+            ApplyAerodynamicDownforce();
             SyncWheelMeshes();
             AutoShift();
             ConsumeFuel();
@@ -171,15 +189,121 @@ namespace HeavyVehiclesWorld.Vehicles
             {
                 _steerWheels = new[] { frontLeft, frontRight };
             }
-            float steer = InputManagerProxy.Steer;
-            WheelPhysicsHelper.ApplySteering(_steerWheels, steer, maxSteerAngle);
+
+            float rawSteer = InputManagerProxy.Steer;
+            _smoothedSteer = Mathf.MoveTowards(_smoothedSteer, rawSteer, steerSensitivity * Time.fixedDeltaTime);
+
+            // Speed-sensitive steering limiting: prevents sharp twitching and flipping at high speed
+            float speedFactor = Mathf.Clamp01(currentSpeed / 120f);
+            float steerLimit = Mathf.Lerp(maxSteerAngle, 14f, speedFactor);
+            float steer = _smoothedSteer * steerLimit;
+
+            WheelPhysicsHelper.ApplySteering(_steerWheels, steer, steerLimit);
+        }
+
+        private void ApplyAntiRoll(WheelCollider left, WheelCollider right)
+        {
+            if (left == null || right == null) return;
+
+            float travelL = 1.0f;
+            float travelR = 1.0f;
+
+            bool groundedL = left.GetGroundHit(out WheelHit hitL);
+            if (groundedL)
+                travelL = (-left.transform.InverseTransformPoint(hitL.point).y - left.radius) / left.suspensionDistance;
+
+            bool groundedR = right.GetGroundHit(out WheelHit hitR);
+            if (groundedR)
+                travelR = (-right.transform.InverseTransformPoint(hitR.point).y - right.radius) / right.suspensionDistance;
+
+            float antiRollForce = (travelL - travelR) * antiRollStiffness;
+
+            if (groundedL)
+                rb.AddForceAtPosition(left.transform.up * -antiRollForce, left.transform.position);
+            if (groundedR)
+                rb.AddForceAtPosition(right.transform.up * antiRollForce, right.transform.position);
+        }
+
+        private void ApplyAerodynamicDownforce()
+        {
+            if (rb == null) return;
+            // Downforce proportional to square of velocity: keeps car grounded firmly at speed
+            rb.AddForce(-transform.up * downforceCoefficient * rb.linearVelocity.sqrMagnitude);
+        }
+
+        private void ConfigureWheelFriction(WheelCollider wc)
+        {
+            if (wc == null) return;
+
+            // Stable forward friction (longitudinal)
+            WheelFrictionCurve fwd = wc.forwardFriction;
+            fwd.extremumSlip = 0.4f;
+            fwd.extremumValue = 1.0f;
+            fwd.asymptoteSlip = 0.8f;
+            fwd.asymptoteValue = 0.7f;
+            fwd.stiffness = 1.25f;
+            wc.forwardFriction = fwd;
+
+            // Stable sideways friction (lateral) - eliminates jitter and unintended drifting
+            WheelFrictionCurve side = wc.sidewaysFriction;
+            side.extremumSlip = 0.35f;
+            side.extremumValue = 1.0f;
+            side.asymptoteSlip = 0.65f;
+            side.asymptoteValue = 0.8f;
+            side.stiffness = 1.4f;
+            wc.sidewaysFriction = side;
         }
 
         public override void UpdateEngineSound()
         {
             if (engineAudioSource == null) return;
-            if (!engineAudioSource.isPlaying) engineAudioSource.Play();
-            engineAudioSource.pitch = 0.5f + (engineRPM / maxRPM) * 1.5f;
+            if (engineAudioSource.clip == null)
+            {
+                engineAudioSource.clip = CreateProceduralEngineClip();
+            }
+
+            if (!engineAudioSource.isPlaying)
+            {
+                engineAudioSource.loop = true;
+                engineAudioSource.Play();
+            }
+
+            float rpmRatio = Mathf.Clamp01(engineRPM / maxRPM);
+            engineAudioSource.pitch = Mathf.Lerp(0.75f, 2.3f, rpmRatio);
+            engineAudioSource.volume = Mathf.Lerp(0.35f, 0.85f, 0.4f + 0.6f * Mathf.Abs(InputManagerProxy.Throttle));
+        }
+
+        public static AudioClip CreateProceduralEngineClip()
+        {
+            int sampleRate = 22050;
+            float duration = 0.5f;
+            int totalSamples = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[totalSamples];
+
+            float fundamentalFreq = 42f; // ~42 Hz rumble for 4-cylinder idle
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float s1 = Mathf.Sin(2f * Mathf.PI * fundamentalFreq * t);
+                float s2 = 0.5f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 2f * t);
+                float s3 = 0.25f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 3f * t);
+                float noise = (UnityEngine.Random.value * 2f - 1f) * 0.08f;
+                samples[i] = Mathf.Clamp((s1 + s2 + s3 + noise) * 0.4f, -1f, 1f);
+            }
+
+            var clip = AudioClip.Create("Synthesized_Car_Engine", totalSamples, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            float impactForce = collision.relativeVelocity.magnitude;
+            if (impactForce > 3.0f)
+            {
+                float dmg = (impactForce - 3.0f) * 1.5f;
+                damageLevel = Mathf.Clamp(damageLevel + dmg, 0f, 100f);
+            }
         }
 
         public override string GetVehicleInfo() => "Car";
