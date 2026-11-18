@@ -333,3 +333,57 @@ public void AddCoins(int amount) {
 **Related to:** Systems, UI, save system, MissionManager, GameManager
 
 ---
+
+---
+### Change #21 | 2026-11-18 12:06
+**Files changed:**
+- Assets/Scripts/Systems/AndroidBuildValidator.cs (NEW)
+- Assets/Scripts/Systems/AndroidPerformanceSettings.cs (NEW)
+**What changed:** Added `AndroidBuildValidator` — `[InitializeOnLoad]` editor static class with 14 automated checks (build target, package name, min/target API, IL2CPP, ARM64, Vulkan, GLES3, auto-graphics API off, orientation, MT rendering, internet access, keystore, incremental GC). Menu item `Tools → HeavyVehiclesWorld → ✅ Validate Android Build Settings` shows pass/fail dialog. Added `AndroidPerformanceSettings` — runtime MonoBehaviour applying frame rate, sleep timeout, physics solver iterations, fixed timestep, streaming mipmaps, skin weights. `AutoApplyDeviceTier()` detects RAM/VRAM and applies Tier 0/1/2 quality presets automatically.
+**New code:**
+```csharp
+// AndroidBuildValidator – one sample check
+Check(PlayerSettings.GetScriptingBackend(BuildTargetGroup.Android) == ScriptingImplementation.IL2CPP,
+      "Scripting Backend = IL2CPP",
+      "Project Settings → Player → Android → Other Settings → Scripting Backend = IL2CPP");
+
+// AndroidPerformanceSettings – device tier
+int tier = (memMB >= 8000 && gpuMem >= 4000) ? 2 : (memMB >= 4000) ? 1 : 0;
+ApplyDeviceTier(tier);
+```
+**Why:** Phase 7 — catch misconfigured build settings before building; apply correct Android runtime settings per device capability.
+**Related to:** Android build, performance, quality settings
+
+---
+### Change #22 | 2026-11-18 12:06
+**Files changed:**
+- Assets/Scripts/Systems/BuildAutomation.cs (NEW)
+- Assets/Scripts/Systems/FinalPerformancePass.cs (NEW)
+**What changed:** Added `BuildAutomation` implementing `IPreprocessBuildWithReport` — aborts build if validator finds failures. Menu items: `🔨 Build Debug APK` (Development+Debugging, outputs `Builds/Android/*.apk`), `📦 Build Release AAB` (signed, outputs `*.aab` for Play Store), `🚀 Build & Run` (auto-installs + connects Profiler). Added `FinalPerformancePass` — on Awake: calls `ShaderVariantCollection.WarmUp()` or `Shader.WarmupAllShaders()` as fallback, runs `GC.Collect()` for clean heap before gameplay, logs full device capabilities to Console (device model, CPU, RAM, GPU, screen res, persistent path).
+**New code:**
+```csharp
+// BuildAutomation – pre-build hook
+public void OnPreprocessBuild(BuildReport report) {
+    var result = AndroidBuildValidator.RunValidation();
+    if (result.failCount > 0) throw new BuildFailedException(...);
+}
+
+// FinalPerformancePass – warm-up
+shaderVariants.WarmUp();
+System.GC.Collect();
+System.GC.WaitForPendingFinalizers();
+```
+**Why:** Phase 7 — one-click build pipeline; prevent first-frame shader hitches; eliminate GC spike at game start.
+**Related to:** Android build, performance, shader warm-up
+
+---
+### Change #23 | 2026-11-18 12:07
+**Files changed:**
+- PHASE7_BUILD_GUIDE.md (NEW)
+- BUILD_GUIDE.md (MODIFIED — copyright "HeavyVehiclesStudio" → "Shivraj Deshmukh")
+**What changed:** Added complete `PHASE7_BUILD_GUIDE.md` with 12 steps: Unity module check, all Project Settings tables, keystore creation (GUI + keytool CLI), ASTC texture compression, shader variant collection baking, Debug APK build, Release AAB build, performance testing tools and targets, device tier auto-detection usage, final cleanup checklist (19 items), Google Play upload steps, build automation reference table, and 7-phase completion summary. Fixed copyright in `BUILD_GUIDE.md` (3 occurrences of "HeavyVehiclesStudio" → "Shivraj Deshmukh").
+**New code:** N/A — documentation and copyright fix only
+**Why:** Phase 7 — complete step-by-step Android build guide; correct ownership throughout all project docs.
+**Related to:** Android build, documentation, copyright
+
+---

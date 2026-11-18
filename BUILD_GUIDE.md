@@ -1,7 +1,7 @@
 # HeavyVehiclesWorld – Android Build Guide
 
 > **Game:** HeavyVehiclesWorld  
-> **Studio:** HeavyVehiclesStudio  
+> **Studio:** Shivraj Deshmukh  
 > **Package:** `com.heavyvehicles.world`
 
 ---
@@ -41,7 +41,7 @@ Open **Edit → Project Settings → Player → Android tab** and verify every i
 
 | Setting | Value |
 |---|---|
-| Company Name | `HeavyVehiclesStudio` |
+| Company Name | `Shivraj Deshmukh` |
 | Product Name | `HeavyVehiclesWorld` |
 | Package Name | `com.heavyvehicles.world` |
 | Version | `1.0` |
@@ -278,4 +278,4 @@ adb devices
 
 ---
 
-*Last updated: 2026-11-18 | HeavyVehiclesStudio*
+*Last updated: 2026-11-18 | Shivraj Deshmukh*
