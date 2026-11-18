@@ -106,5 +106,11 @@ namespace HeavyVehiclesWorld.Systems
             if (v == null) return;
             v.damageLevel = Mathf.Clamp(v.damageLevel + amount, 0f, 100f);
         }
+
+        /// <summary>Award coins to the player via CurrencyManager.</summary>
+        public void AddCurrency(int amount)
+        {
+            CurrencyManager.Instance?.AddCoins(amount);
+        }
     }
 }

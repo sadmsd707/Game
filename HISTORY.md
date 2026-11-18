@@ -260,3 +260,76 @@ public static string LoadWorldState() { ... return File.ReadAllText(WorldStatePa
 **Related to:** UI, World systems, audio, save system
 
 ---
+
+---
+### Change #18 | 2026-11-18 12:02
+**Files changed:**
+- Assets/Scripts/UI/MissionCompletePanel.cs (NEW)
+- Assets/Scripts/UI/PerformanceMonitor.cs (NEW)
+**What changed:** Added `MissionCompletePanel` — full-screen animated reward overlay with coin count-up animation, 3-star reveal sequence (one star at a time with SFX), panel scale-punch on show, fade in/out, auto-hide timer, Continue and MainMenu buttons. Subscribes to `MissionManager.OnMissionCompleted`. Added `PerformanceMonitor` — in-game HUD showing FPS (color-coded green/yellow/red), peak/low FPS, memory used/reserved, draw calls (Editor only), active quality level. Toggle with P key.
+**New code:**
+```csharp
+// MissionCompletePanel.cs – key method
+public void ShowMission(MissionData data) {
+    int stars = CalculateStars(data);
+    ShowPanel(data.description, data.reward, stars);
+}
+
+// PerformanceMonitor.cs – key display
+string color = _fps >= 55f ? "#00FF88" : _fps >= 30f ? "#FFDD00" : "#FF4444";
+fpsLabel.text = $"<color={color}>{_fps:F0}</color> FPS (low:{_lowestFPS:F0} peak:{_peakFPS:F0})";
+```
+**Why:** Phase 6 — mission completion rewards UI + mobile performance QA tool.
+**Related to:** UI, MissionManager, GraphicsSettingsManager
+
+---
+### Change #19 | 2026-11-18 12:02
+**Files changed:**
+- Assets/Scripts/Effects/ParticlePoolManager.cs (NEW)
+- Assets/Scripts/Vehicles/VehicleLODSetup.cs (NEW)
+**What changed:** Added `ParticlePoolManager` singleton — pre-warms particle pools at startup, `Play(poolId, pos)` returns a pooled ParticleSystem and auto-returns it to the pool when it finishes (coroutine-based). `PlayAttached(poolId, parent)` supports vehicle wheel/exhaust attachment. Max count cap prevents over-spawning. Added `VehicleLODSetup` — `[ExecuteInEditMode]` editor helper that creates/updates a `LODGroup` component on vehicle root GameObjects with configurable LOD0/1/2 renderers and crossfade mode. Right-click → Auto Configure LOD Group.
+**New code:**
+```csharp
+// ParticlePoolManager – play from pool
+public ParticleSystem Play(string poolId, Vector3 pos, Quaternion? rot = null) {
+    var ps = GetFromPool(poolId);
+    ps.transform.position = pos;
+    ps.Play();
+    StartCoroutine(ReturnWhenFinished(ps, poolId));
+    return ps;
+}
+// VehicleLODSetup – configure
+lodGroup.SetLODs(lods.ToArray());
+lodGroup.fadeMode = crossFade ? LODFadeMode.CrossFade : LODFadeMode.None;
+```
+**Why:** Phase 6 — eliminate runtime particle Instantiate() spikes on mobile; reduce draw calls via LOD groups.
+**Related to:** Effects, Vehicles, performance optimization
+
+---
+### Change #20 | 2026-11-18 12:02
+**Files changed:**
+- Assets/Scripts/Systems/FullSaveLoadManager.cs (NEW)
+- Assets/Scripts/Systems/CurrencyManager.cs (NEW)
+- Assets/Scripts/Systems/GameManager.cs (MODIFIED)
+- PHASE6_SETUP_GUIDE.md (NEW)
+**What changed:** Added `FullSaveLoadManager` singleton — unified save/load integrating player position/rotation, all 6 vehicle fuel+damage+transform, day time, mission states, and field progress. Auto-saves every 5 minutes (configurable). Writes `saves/slot1.json` and delegates world state to `SaveSystem.SaveWorldState()`. Added `CurrencyManager` singleton — tracks player coin balance via PlayerPrefs, `AddCoins()`/`SpendCoins()`, broadcasts `OnCoinsChanged` event. Modified `GameManager.cs` — added `AddCurrency(int)` method that delegates to `CurrencyManager.Instance.AddCoins()` (MissionManager already called this). Added `PHASE6_SETUP_GUIDE.md`.
+**New code:**
+```csharp
+// GameManager.cs addition
+public void AddCurrency(int amount) => CurrencyManager.Instance?.AddCoins(amount);
+
+// FullSaveLoadManager – auto-save
+_autoSaveTimer += Time.deltaTime;
+if (_autoSaveTimer >= autoSaveInterval) { SaveAll("slot1"); }
+
+// CurrencyManager
+public void AddCoins(int amount) {
+    CurrentCoins = Mathf.Max(0, CurrentCoins + amount);
+    PlayerPrefs.SetInt(PrefsKey, CurrentCoins);
+    OnCoinsChanged?.Invoke(CurrentCoins);
+}
+```
+**Why:** Phase 6 — complete save/load system integrating all game systems; mission reward currency pipeline fully wired.
+**Related to:** Systems, UI, save system, MissionManager, GameManager
+
+---
