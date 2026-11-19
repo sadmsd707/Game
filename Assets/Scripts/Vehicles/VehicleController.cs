@@ -59,7 +59,16 @@ namespace HeavyVehiclesWorld.Vehicles
         [Header("Wheel Colliders")]
         public WheelCollider[] wheelColliders;
 
-        [HideInInspector] public Rigidbody rb;
+        [HideInInspector] [SerializeField] private Rigidbody _rb;
+        public Rigidbody rb
+        {
+            get
+            {
+                if (_rb == null) _rb = GetComponent<Rigidbody>();
+                return _rb;
+            }
+            set { _rb = value; }
+        }
 
         // ── Audio ─────────────────────────────────────────────────────────
         [Header("Audio")]
@@ -75,14 +84,20 @@ namespace HeavyVehiclesWorld.Vehicles
         public UnityEvent<VehicleController> OnVehicleExited;
 
         // ── Lifecycle ─────────────────────────────────────────────────────
+        protected virtual void Awake()
+        {
+            if (_rb == null) _rb = GetComponent<Rigidbody>();
+            if (engineAudioSource == null) engineAudioSource = GetComponent<AudioSource>();
+        }
+
         protected virtual void Start()
         {
-            rb = GetComponent<Rigidbody>();
+            if (_rb == null) _rb = GetComponent<Rigidbody>();
             if (engineAudioSource == null)
                 engineAudioSource = GetComponent<AudioSource>();
 
             // Lower the centre of mass to improve stability
-            rb.centerOfMass = new Vector3(0f, -0.5f, 0f);
+            if (_rb != null) _rb.centerOfMass = new Vector3(0f, -0.5f, 0f);
         }
 
         protected virtual void Update()

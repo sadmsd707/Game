@@ -1380,3 +1380,63 @@ Golden Rule 6 and Phase 0 Safety Net requirement: Release APK builds on device p
 
 **Related to:** Phase 0 Safety Net, Build Stamp, Diagnostics Overlay, Mobile Telemetry, EventSystem Tracking, Shader Error Detection, Log Ring Buffer
 ---
+
+
+### Change #40 | 2026-11-20 03:00
+**Files changed:**
+- Assets/Editor/HVW_TouchPathTest.cs (NEW)
+- Assets/Scripts/Vehicles/VehicleController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/JCBController.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_FollowCamera.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Resources/hvw_build_info.json (MODIFIED)
+- ProjectSettings/ProjectSettings.asset (MODIFIED)
+
+**What changed:**
+- Phase 1 - Make Every Vehicle Drive Complete Resolution:
+  - Authored comprehensive touch-path integration test (`Assets/Editor/HVW_TouchPathTest.cs`) executing real touch events (`ExecuteEvents.pointerDownHandler` / `pointerUpHandler`) on Gas, Brake, Steer Left, and Steer Right buttons across flat ground, 10° slope ramp climb, and high-speed sharp turns.
+  - Eliminated rogue solid colliders generated on wheel visual cylinder meshes: replaced delayed `Destroy(c)` with immediate destruction and added automatic non-wheel collider stripping in `HVW_WorldInitializer.cs` (`SafeDestroy`).
+  - Added fallback delta time to `HandleMobileInputSmoothing()` (`dt = Time.deltaTime > 0.0001f ? Time.deltaTime : Time.fixedDeltaTime;`) preventing frozen input updates during pause or zero-delta frames.
+  - Implemented lazy getter and cached initialization for Rigidbody in `VehicleController.cs` (`public Rigidbody rb { get { if (_rb == null) _rb = GetComponent<Rigidbody>(); return _rb; } }`).
+  - Fixed JCB permanent stabilizer brake lock: Added `RetractStabilizers()` call when automated dig cycle concludes (`_digCycleTimer >= 3.0f`) in `JCBController.cs`, and added `OnEnable()` retraction to ensure drive torque is never locked.
+  - Fixed camera interior clipping in `HVW_FollowCamera.cs`: Replaced single `SphereCast` with `Physics.SphereCastAll`, explicitly filtering out target transforms, target children, and colliders attached to `targetRb`. Enforced a minimum camera distance of `Mathf.Max(followDist * 0.45f, 3.2f)`.
+  - Fixed HUD vehicle label and gear synchronization in `HVW_WorldInitializer.cs`: Dynamically maps vehicle types to human-readable labels (`Car (SUV)`, `Tractor (Agri)`, `Truck (Tipper)`, `JCB (Backhoe)`, `Excavator`, `Harvester`), widened the HUD label rect to 145px, enabled `resizeTextForBestFit = true` with wrap/truncate across all UI buttons/texts, and updated `SelectVehicle()` to immediately refresh HUD upon vehicle switch.
+  - Relocated Tractor spawn to `(20f, 0.65f, -10f)` with unobstructed path away from construction cones and roadside trees.
+  - Built Android Production APK (Build #3, `bundleVersionCode: 3`, `v1.36-b3`).
+
+**New code:**
+```csharp
+// JCBController.cs - Stabilizer auto-retraction
+else
+{
+    _isPerformingDigCycle = false;
+    RetractStabilizers();
+}
+
+// HVW_FollowCamera.cs - Self-collision exclusion
+var hits = Physics.SphereCastAll(origin, 0.25f, rayDir.normalized, dist, ~0, QueryTriggerInteraction.Ignore);
+float closestValidDist = dist;
+var targetRb = target.GetComponent<Rigidbody>();
+for (int i = 0; i < hits.Length; i++)
+{
+    var h = hits[i];
+    if (h.collider == null) continue;
+    if (h.transform == target || h.transform.IsChildOf(target)) continue;
+    if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
+    if (h.distance < closestValidDist) closestValidDist = h.distance;
+}
+```
+
+**Why:**
+Phase 1 core requirement: All six vehicles failed to drive via touch UI on device due to solid primitive colliders dragging on ground with 100% wheel slip, JCB stabilizers remaining permanently engaged after dig strokes, camera clipping inside vehicle meshes, and HUD labels truncated by fixed-size non-scaling UI text.
+
+*Previous code:*
+```csharp
+// Previously, wheel visual cylinders retained active CapsuleColliders that anchored the vehicle to the ground.
+// JCB TriggerDigStroke deployed stabilizers without ever retracting them upon completion.
+// Follow camera SphereCast hit vehicle child colliders and clamped to 1.8m inside the cabin.
+// UI text lacked resizeTextForBestFit, causing top bar and HUD text truncation.
+```
+
+**Related to:** Phase 1, Drivability, Wheel Physics, Touch Input Path, JCB Stabilizers, Camera Occlusion, Dynamic HUD
+---

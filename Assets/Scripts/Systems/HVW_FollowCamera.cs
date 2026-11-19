@@ -115,15 +115,27 @@ namespace HeavyVehiclesWorld.Systems
                     }
                     rawPos = target.position - target.forward * followDist + Vector3.up * followHeight;
                     // Obstacle occlusion avoidance (prevents camera clipping into trees, crates, walls)
-                    Vector3 origin = target.position + Vector3.up * 1.4f;
+                    Vector3 origin = target.position + Vector3.up * 1.6f;
                     Vector3 rayDir = rawPos - origin;
                     float dist = rayDir.magnitude;
-                    if (Physics.SphereCast(origin, 0.25f, rayDir.normalized, out RaycastHit hit, dist, ~0, QueryTriggerInteraction.Ignore))
+                    var hits = Physics.SphereCastAll(origin, 0.25f, rayDir.normalized, dist, ~0, QueryTriggerInteraction.Ignore);
+                    float closestValidDist = dist;
+                    var targetRb = target.GetComponent<Rigidbody>();
+                    for (int i = 0; i < hits.Length; i++)
                     {
-                        if (hit.transform != target && !hit.transform.IsChildOf(target))
+                        var h = hits[i];
+                        if (h.collider == null) continue;
+                        if (h.transform == target || h.transform.IsChildOf(target)) continue;
+                        if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
+                        if (h.distance < closestValidDist)
                         {
-                            rawPos = origin + rayDir.normalized * Mathf.Max(hit.distance - 0.25f, 1.8f);
+                            closestValidDist = h.distance;
                         }
+                    }
+                    if (closestValidDist < dist)
+                    {
+                        float minSafeDist = Mathf.Max(followDist * 0.45f, 3.2f);
+                        rawPos = origin + rayDir.normalized * Mathf.Max(closestValidDist - 0.25f, minSafeDist);
                     }
                     break;
             }

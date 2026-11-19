@@ -83,6 +83,11 @@ namespace HeavyVehiclesWorld.Vehicles
         private bool _isPerformingDigCycle;
         private float _digCycleTimer;
 
+        private void OnEnable()
+        {
+            RetractStabilizers();
+        }
+
         // ── Lifecycle ──────────────────────────────────────────────────────
         protected override void Start()
         {
@@ -368,6 +373,7 @@ namespace HeavyVehiclesWorld.Vehicles
                 else
                 {
                     _isPerformingDigCycle = false;
+                    RetractStabilizers();
                 }
             }
 

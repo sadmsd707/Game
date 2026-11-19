@@ -245,7 +245,7 @@ namespace HeavyVehiclesWorld.Systems
                 : new Vector3(0.04f, 0.2f, 1f);
             stripe.GetComponent<Renderer>().sharedMaterial = stripeMat;
             var c = stripe.GetComponent<Collider>();
-            if (c) Destroy(c);
+            if (c) SafeDestroy(c);
         }
 
         private void BuildWorldProps()
@@ -329,7 +329,7 @@ namespace HeavyVehiclesWorld.Systems
             leaves.transform.localScale = new Vector3(3.5f, 3.5f, 3.5f);
             leaves.GetComponent<Renderer>().sharedMaterial = leavesMat;
             var leafCol = leaves.GetComponent<Collider>();
-            if (leafCol) Destroy(leafCol);
+            if (leafCol) SafeDestroy(leafCol);
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -348,10 +348,10 @@ namespace HeavyVehiclesWorld.Systems
             SetupVehiclePhysicsAndWheels(car, carCtrl, 0.38f, 1500f, carColor, carSize);
             _allVehicles.Add(carCtrl);
 
-            // 2. TRACTOR - Farm entrance (15, 0.65, 8)
+            // 2. TRACTOR - Farm path (20, 0.65, -10)
             var tracColor = new Color(0.18f, 0.65f, 0.22f); // Farm Green
             var tracSize  = new Vector3(2.2f, 2.4f, 3.8f);
-            var tractor = CreateVehicleEntity("Tractor_Agri", VehicleType.Tractor, new Vector3(15f, 0.65f, 8f), Quaternion.Euler(0, 45, 0), tracColor, tracSize, 4000f);
+            var tractor = CreateVehicleEntity("Tractor_Agri", VehicleType.Tractor, new Vector3(20f, 0.65f, -10f), Quaternion.Euler(0f, 180f, 0f), tracColor, tracSize, 4000f);
             var tractorCtrl = tractor.AddComponent<TractorController>();
             tractorCtrl.vehicleType = VehicleType.Tractor;
             SetupVehiclePhysicsAndWheels(tractor, tractorCtrl, 0.5f, 4000f, tracColor, tracSize);
@@ -811,7 +811,7 @@ namespace HeavyVehiclesWorld.Systems
                 cyl.GetComponent<Renderer>().sharedMaterial = tireMat;
 
                 var c = cyl.GetComponent<Collider>();
-                if (c) Destroy(c);
+                if (c) SafeDestroy(c);
 
                 if (slot != null && i < slot.wheels.Length)
                 {
@@ -857,6 +857,22 @@ namespace HeavyVehiclesWorld.Systems
 
             slot.placeholderVisuals = placeholderGo;
             slot.ValidateModelPresence();
+
+            // Strip any rogue non-wheel colliders that might have leaked into child visual components
+            var rootCol = root.GetComponent<BoxCollider>();
+            foreach (var col in root.GetComponentsInChildren<Collider>())
+            {
+                if (col != rootCol && !(col is WheelCollider))
+                {
+                    SafeDestroy(col);
+                }
+            }
+        }
+
+        private static void SafeDestroy(UnityEngine.Object obj)
+        {
+            if (obj == null) return;
+            DestroyImmediate(obj);
         }
 
         private GameObject CreateBox(string name, Transform parent, Vector3 localPos, Vector3 localScale, Color color)
@@ -879,7 +895,7 @@ namespace HeavyVehiclesWorld.Systems
             go.transform.localScale = localScale;
             go.GetComponent<Renderer>().sharedMaterial = mat;
             var c = go.GetComponent<Collider>();
-            if (c) Destroy(c);
+            if (c) SafeDestroy(c);
             return go;
         }
 
@@ -977,12 +993,12 @@ namespace HeavyVehiclesWorld.Systems
             // ── Top Toolbar: Vehicle Switcher (Row 1: Y = -22f) ────────────────
             var vehicleDefs = new (string label, VehicleType type)[]
             {
-                ("🚗 CAR", VehicleType.Car),
-                ("🚜 TRACTOR", VehicleType.Tractor),
-                ("🚛 TRUCK", VehicleType.Truck),
-                ("🏗️ JCB", VehicleType.JCB),
-                ("⛏️ EXCAVATOR", VehicleType.Excavator),
-                ("🌾 HARVESTER", VehicleType.Harvester)
+                ("CAR", VehicleType.Car),
+                ("TRACTOR", VehicleType.Tractor),
+                ("TRUCK", VehicleType.Truck),
+                ("JCB", VehicleType.JCB),
+                ("EXCAV", VehicleType.Excavator),
+                ("HARVEST", VehicleType.Harvester)
             };
 
             for (int i = 0; i < vehicleDefs.Length; i++)
@@ -996,25 +1012,25 @@ namespace HeavyVehiclesWorld.Systems
             }
 
             // Diagnostics Button (Top-Right, Row 1, left of Settings)
-            CreateClickButton(canvasGo, "Btn_ToggleDBG", "🔧 DBG",
+            CreateClickButton(canvasGo, "Btn_ToggleDBG", "DBG",
                 new Vector2(1f, 1f), new Vector2(-286f, -22f), new Vector2(56f, 30f),
                 new Color(0.35f, 0.15f, 0.55f, 0.90f),
                 () => { if (_diagOverlay != null) _diagOverlay.Toggle(); });
 
             // Settings Button (Top-Right, Row 1)
-            CreateClickButton(canvasGo, "Btn_Settings", "⚙️ SETTINGS",
+            CreateClickButton(canvasGo, "Btn_Settings", "SETTINGS",
                 new Vector2(1f, 1f), new Vector2(-212f, -22f), new Vector2(76f, 30f),
                 new Color(0.25f, 0.35f, 0.45f, 0.90f),
                 () => { ToggleSettingsPanel(); });
 
             // Camera Toggle Button (Top-Right, Row 1)
-            CreateClickButton(canvasGo, "Btn_CamView", "📷 VIEW",
+            CreateClickButton(canvasGo, "Btn_CamView", "VIEW",
                 new Vector2(1f, 1f), new Vector2(-130f, -22f), new Vector2(76f, 30f),
                 new Color(0.25f, 0.25f, 0.30f, 0.90f),
                 () => { if (_followCamera) _followCamera.ToggleCameraMode(); });
 
             // Reset Vehicle Button (Top-Right, Row 1)
-            CreateClickButton(canvasGo, "Btn_ResetVeh", "🔄 RESET",
+            CreateClickButton(canvasGo, "Btn_ResetVeh", "RESET",
                 new Vector2(1f, 1f), new Vector2(-48f, -22f), new Vector2(76f, 30f),
                 new Color(0.35f, 0.35f, 0.40f, 0.90f),
                 () => { ResetActiveVehicle(); });
@@ -1032,7 +1048,7 @@ namespace HeavyVehiclesWorld.Systems
 
             _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 20, TextAnchor.MiddleCenter, new Vector2(0f, 16f), new Vector2(280f, 24f), Color.white);
             _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 12, TextAnchor.MiddleCenter, new Vector2(-75f, -6f), new Vector2(110f, 18f), new Color(0.4f, 0.85f, 1f));
-            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 12, TextAnchor.MiddleCenter, new Vector2(75f, -6f), new Vector2(130f, 18f), new Color(1f, 0.85f, 0.3f));
+            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 12, TextAnchor.MiddleCenter, new Vector2(75f, -6f), new Vector2(145f, 20f), new Color(1f, 0.85f, 0.3f));
             CreateText(hudPanel, "Txt_BuildStamp", HVW_BuildInfo.FullStamp, 10, TextAnchor.MiddleCenter, new Vector2(0f, -24f), new Vector2(290f, 16f), new Color(0.75f, 0.75f, 0.75f));
 
             // Initialize Diagnostics Overlay UI
@@ -1181,6 +1197,11 @@ namespace HeavyVehiclesWorld.Systems
             var t = go.AddComponent<Text>();
             t.text = text;
             t.fontSize = fontSize;
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = 8;
+            t.resizeTextMaxSize = fontSize;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
             t.alignment = alignment;
             t.color = col;
             t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -1211,6 +1232,11 @@ namespace HeavyVehiclesWorld.Systems
             var t = txtGo.AddComponent<Text>();
             t.text = label;
             t.fontSize = 20;
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = 10;
+            t.resizeTextMaxSize = 20;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
             t.fontStyle = FontStyle.Bold;
             t.alignment = TextAnchor.MiddleCenter;
             t.color = Color.white;
@@ -1258,7 +1284,12 @@ namespace HeavyVehiclesWorld.Systems
             txtRect.offsetMax = Vector2.zero;
             var t = txtGo.AddComponent<Text>();
             t.text = label;
-            t.fontSize = 18;
+            t.fontSize = 15;
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = 9;
+            t.resizeTextMaxSize = 15;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
             t.fontStyle = FontStyle.Bold;
             t.alignment = TextAnchor.MiddleCenter;
             t.color = Color.white;
@@ -1273,17 +1304,20 @@ namespace HeavyVehiclesWorld.Systems
         // ══════════════════════════════════════════════════════════════════════
         private void HandleMobileInputSmoothing()
         {
+            float dt = Time.deltaTime > 0.0001f ? Time.deltaTime : Time.fixedDeltaTime;
+            if (dt <= 0.0001f) dt = 0.02f;
+
             // Steer smoothing
             float targetSteer = 0f;
             if (_steerLeftHeld) targetSteer -= 1f;
             if (_steerRightHeld) targetSteer += 1f;
-            _currentSteer = Mathf.MoveTowards(_currentSteer, targetSteer, Time.deltaTime * 5f);
+            _currentSteer = Mathf.MoveTowards(_currentSteer, targetSteer, dt * 5f);
 
             // Throttle & Brake smoothing
             float targetThrottle = _accelHeld ? 1f : 0f;
             float targetBrake = _brakeHeld ? 1f : 0f;
-            _currentThrottle = Mathf.MoveTowards(_currentThrottle, targetThrottle, Time.deltaTime * 6f);
-            _currentBrake = Mathf.MoveTowards(_currentBrake, targetBrake, Time.deltaTime * 8f);
+            _currentThrottle = Mathf.MoveTowards(_currentThrottle, targetThrottle, dt * 6f);
+            _currentBrake = Mathf.MoveTowards(_currentBrake, targetBrake, dt * 8f);
 
             float hb = _handbrakeHeld ? 1f : 0f;
 
@@ -1317,22 +1351,41 @@ namespace HeavyVehiclesWorld.Systems
 
             if (_gearText != null)
             {
-                string gearStr = _brakeHeld && speedKmh < 1f ? "GEAR: R" : "GEAR: D1";
+                string gearStr = "GEAR: D1";
+                if (_brakeHeld && speedKmh < 0.5f)
+                    gearStr = "GEAR: R";
+                else if (_activeVehicle.currentGear == GearState.Reverse)
+                    gearStr = "GEAR: R";
+                else if (_activeVehicle.currentGear == GearState.Neutral)
+                    gearStr = "GEAR: N";
+                else
+                    gearStr = "GEAR: D1";
                 _gearText.text = gearStr;
             }
 
             if (_vehicleNameText != null)
             {
+                string baseName = _activeVehicle.vehicleType switch
+                {
+                    VehicleType.Car => "Car (SUV)",
+                    VehicleType.Tractor => "Tractor (Agri)",
+                    VehicleType.Truck => "Truck (Tipper)",
+                    VehicleType.JCB => "JCB (Backhoe)",
+                    VehicleType.Excavator => "Excavator",
+                    VehicleType.Harvester => "Harvester",
+                    _ => _activeVehicle.VehicleName
+                };
+
                 if (_activeVehicle is HarvesterController hc)
-                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Grain: {hc.grainLevel:F0}%";
+                    _vehicleNameText.text = $"{baseName} | {hc.grainLevel:F0}%";
                 else if (_activeVehicle is ExcavatorController ec)
-                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Soil: {ec.currentSoilVolume:P0}";
+                    _vehicleNameText.text = $"{baseName} | {ec.currentSoilVolume:P0}";
                 else if (_activeVehicle is JCBController jcb)
-                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Soil: {jcb.soilPayload:P0}";
+                    _vehicleNameText.text = $"{baseName} | {jcb.soilPayload:P0}";
                 else if (_activeVehicle is TruckController tk)
-                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Cargo: {tk.currentPayload:F0}kg";
+                    _vehicleNameText.text = $"{baseName} | {tk.currentPayload:F0}kg";
                 else
-                    _vehicleNameText.text = _activeVehicle.VehicleName;
+                    _vehicleNameText.text = baseName;
             }
         }
 
@@ -1354,6 +1407,16 @@ namespace HeavyVehiclesWorld.Systems
             _activeVehicle.currentGear = GearState.Drive;
             _activeVehicle.throttleInput = 0f;
             _activeVehicle.brakeInput = 0f;
+
+            if (_activeVehicle is JCBController jcbCtrl)
+            {
+                jcbCtrl.RetractStabilizers();
+            }
+
+            if (_activeVehicle.rb != null && _activeVehicle.rb.IsSleeping())
+            {
+                _activeVehicle.rb.WakeUp();
+            }
 
             if (_followCamera != null)
             {
@@ -1377,6 +1440,7 @@ namespace HeavyVehiclesWorld.Systems
             }
 
             UpdateActionUI();
+            UpdateHUD();
         }
 
         private void TriggerVehicleAction(int buttonIndex = 1)
