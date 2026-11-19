@@ -1283,3 +1283,36 @@ Step 6 requires executing the pre-build validation check, compiling the signed p
 
 **Related to:** Step 6 Android Build, Production APK, Signed Release, Keystore, ARM64, IL2CPP, Android 14, SHA-256 Checksum, Mobile Testing Checklist
 ---
+
+### Change #38 | 2026-11-20 01:30
+**Files changed:**
+- README.md (MODIFIED)
+
+**What changed:**
+- Comprehensive README Documentation & Version History Upgrade:
+  - Upgraded README to reflect Version 1.36 Production Release specifications, Unity 6 (6000.6.9f1) requirements, and Android 8.0+ / ARM64 IL2CPP architecture.
+  - Formulated complete **📜 Version History & Changelog** section mapping every change in `HISTORY.md` sequentially from **Version 1.0** (Change #1) through **Version 1.36** (Change #37), detailing exact features, physics tuning, and system fixes implemented in each version.
+  - Documented production release APK artifacts, size (35.02 MB), SHA-256 checksum (`73fffd94402d9c702ef69a735daedc0edfc8846547b05340c78e00a5f1f639ab`), mobile touch HUD layout, and in-game settings modal.
+
+**New code:**
+```markdown
+// README.md - Version History & Changelog (Version 1.0 through Version 1.36)
+### Version 1.0 | Change #1
+- Project Kickoff & Directory Scaffold: Established complete Unity project architecture.
+...
+### Version 1.36 | Change #37 (Step 6 - Android Release Build)
+- Production Signed Release APK: Pre-build validation check (13/13 passed), compiled HeavyVehiclesWorld_Production.apk (35.02 MB) signed with HVW_Production.keystore.
+```
+
+**Why:**
+User requested updating README.md to document the full Version History starting from Version 1.0 for the baseline, incrementally upgrading by 1.1, 1.2, ..., 1.36 for every change in HISTORY.md, detailing what was done in each version before pushing all changes to GitHub.
+
+*Previous code:*
+```markdown
+// README.md previously reflected early project scaffold state (Unity 2022.3 LTS, Phase 1 current),
+// had no version history or change mapping corresponding to HISTORY.md,
+// and did not include production release APK download details, SHA-256 checksums, or mobile settings controls.
+```
+
+**Related to:** Documentation, README.md, Version History, Changelog, GitHub Release
+---
