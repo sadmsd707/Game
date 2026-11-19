@@ -3,7 +3,7 @@
 [![Unity](https://img.shields.io/badge/Unity-6000.6.9f1%20(Unity%206)-blue.svg)](https://unity.com/)
 [![Render Pipeline](https://img.shields.io/badge/URP-Universal%20Render%20Pipeline-lightgrey.svg)](https://unity.com/srp/universal-render-pipeline)
 [![Platform](https://img.shields.io/badge/Platform-Android%20(ARM64%20IL2CPP)-green.svg)](https://www.android.com/)
-[![Version](https://img.shields.io/badge/Release-v1.36--b5%20(Build%20%235)-orange.svg)](https://github.com/sadmsd707/Game)
+[![Version](https://img.shields.io/badge/Release-v1.36--b6%20(Build%20%236)-orange.svg)](https://github.com/sadmsd707/Game)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE.md)
 
 A production-ready open-world mobile simulation game built with **Unity 6 (6000.6.9f1)** and the **Universal Render Pipeline (URP)**. Explore an expansive world featuring a multi-lane highway, construction zones, agricultural crop fields, and quarry dig sites across six drivable, physically-calibrated heavy vehicles.
@@ -14,9 +14,9 @@ A production-ready open-world mobile simulation game built with **Unity 6 (6000.
 
 - **Artifact Name:** `HeavyVehiclesWorld_Production.apk`
 - **Location:** `Builds/Android/HeavyVehiclesWorld_Production.apk`
-- **Build Number:** Build #5 (`bundleVersionCode: 5`, `v1.36-b5`)
-- **File Size:** 38.04 MB (39,885,212 bytes)
-- **SHA-256 Checksum:** `4A6E9BE2BBE622B69500E6D445CC6A8C4F4C3E84AA081F11D8598EBA0433F879`
+- **Build Number:** Build #6 (`bundleVersionCode: 6`, `v1.36-b6`)
+- **File Size:** 38.04 MB (39,885,612 bytes)
+- **SHA-256 Checksum:** `F7F699F9FD398B1BE1B9178C3C188B473B9227A3C9FCCE1A9522B5FAF9893A50`
 - **Architecture:** ARM64 (`v8a`, IL2CPP)
 - **Minimum OS:** Android 8.0 Oreo (API Level 26)
 - **Target OS:** Android 14 (API Level 34)
@@ -217,6 +217,13 @@ Every modification in project development is tracked below, corresponding direct
   - Updated `ASSET_INTEGRATION_GUIDE.md` with exact filenames, ASTC compression table, tier performance specifications, and fallback architecture.
   - Executed automated screenshot verification across all 4 tiers (`HVW_RenderingValidation.RunPhase3TierValidation`): verified **0 magenta pixels (0.00%) and 0 white patches (0.00%)** across Low, Medium, High, and Ultra.
   - Compiled and packaged Android Production APK Build #5 (`HeavyVehiclesWorld_Production.apk`, 38.04 MB, `bundleVersionCode: 5`, SHA-256: `4A6E9BE2BBE622B69500E6D445CC6A8C4F4C3E84AA081F11D8598EBA0433F879`).
+
+### Version 1.42 | Change #43 (Phase 4 - Production Release)
+- **Pre-Release Validator & Official Signed Release APK:**
+  - Authored `Assets/Editor/HVW_ReleaseValidator.cs`: executes 4 automated pre-release suites covering Android build settings (13/13 passed), all 4 URP quality tiers, texture ASTC platform overrides, and release keystore verification.
+  - HUD Polish & Release De-cluttering: `Btn_ToggleDBG` is automatically hidden in production release builds; linked `Txt_BuildStamp` as a secret tap trigger to toggle the diagnostics overlay for QA testing.
+  - Incremented build counter to Build #6 (`bundleVersionCode: 6`, `v1.36-b6`).
+  - Compiled and packaged official signed production release APK: `HeavyVehiclesWorld_Production.apk` (38.04 MB, signed with `HVW_Production.keystore`, SHA-256: `F7F699F9FD398B1BE1B9178C3C188B473B9227A3C9FCCE1A9522B5FAF9893A50`).
 
 ---
 

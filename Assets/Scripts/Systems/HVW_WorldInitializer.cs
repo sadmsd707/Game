@@ -1031,10 +1031,14 @@ namespace HeavyVehiclesWorld.Systems
             }
 
             // Diagnostics Button (Top-Right, Row 1, left of Settings)
-            CreateClickButton(canvasGo, "Btn_ToggleDBG", "DBG",
+            var dbgBtn = CreateClickButton(canvasGo, "Btn_ToggleDBG", "DBG",
                 new Vector2(1f, 1f), new Vector2(-286f, -22f), new Vector2(56f, 30f),
                 new Color(0.35f, 0.15f, 0.55f, 0.90f),
                 () => { if (_diagOverlay != null) _diagOverlay.Toggle(); });
+#if !DEVELOPMENT_BUILD && !UNITY_EDITOR
+            // For production release, hide the DBG button by default so HUD is clean
+            dbgBtn.SetActive(false);
+#endif
 
             // Settings Button (Top-Right, Row 1)
             CreateClickButton(canvasGo, "Btn_Settings", "SETTINGS",
@@ -1068,7 +1072,10 @@ namespace HeavyVehiclesWorld.Systems
             _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 20, TextAnchor.MiddleCenter, new Vector2(0f, 16f), new Vector2(280f, 24f), Color.white);
             _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 12, TextAnchor.MiddleCenter, new Vector2(-75f, -6f), new Vector2(110f, 18f), new Color(0.4f, 0.85f, 1f));
             _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 12, TextAnchor.MiddleCenter, new Vector2(75f, -6f), new Vector2(145f, 20f), new Color(1f, 0.85f, 0.3f));
-            CreateText(hudPanel, "Txt_BuildStamp", HVW_BuildInfo.FullStamp, 10, TextAnchor.MiddleCenter, new Vector2(0f, -24f), new Vector2(290f, 16f), new Color(0.75f, 0.75f, 0.75f));
+            var stampText = CreateText(hudPanel, "Txt_BuildStamp", HVW_BuildInfo.FullStamp, 10, TextAnchor.MiddleCenter, new Vector2(0f, -24f), new Vector2(290f, 16f), new Color(0.75f, 0.75f, 0.75f));
+            var stampBtn = stampText.gameObject.AddComponent<Button>();
+            stampBtn.transition = Selectable.Transition.None;
+            stampBtn.onClick.AddListener(() => { if (_diagOverlay != null) _diagOverlay.Toggle(); });
 
             // Initialize Diagnostics Overlay UI
             if (_diagOverlay != null)

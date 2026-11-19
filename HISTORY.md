@@ -1639,3 +1639,50 @@ Phase 3 core requirement: Deliver production-grade visual fidelity across divers
 
 **Related to:** Phase 3, Quality Tiers, URP Pipeline Assets, SSAO, ASTC Textures, Light Probes, Reflection Probes, Hardware Auto-Detection, Settings Modal, Zero-Magenta Validation
 ---
+
+
+### Change #43 | 2026-11-20 04:05
+**Files changed:**
+- Assets/Editor/HVW_ReleaseValidator.cs (NEW)
+- Assets/Resources/hvw_build_info.json (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- ProjectSettings/ProjectSettings.asset (MODIFIED)
+- HISTORY.md (MODIFIED)
+- README.md (MODIFIED)
+
+**What changed:**
+- Phase 4 - Final Production Release & Pre-Release Validation Complete:
+  - Created `Assets/Editor/HVW_ReleaseValidator.cs`: executes 4 comprehensive validation suites covering Android build settings (13/13 passed), all 4 URP quality tier assets, texture ASTC Android overrides, and production keystore integrity.
+  - Hardened HUD overlay presentation for production release: `Btn_ToggleDBG` is automatically hidden in release builds to present an immaculate player HUD without debugging clutter.
+  - Linked `Txt_BuildStamp` as a secret discreet tap trigger to toggle the diagnostics overlay for QA testing without intrusive on-screen buttons.
+  - Incremented build counter to Build #6 (`bundleVersionCode: 6`, `v1.36-b6`) in `hvw_build_info.json` and `PlayerSettings.asset`.
+  - Compiled and packaged the official signed production release APK: `HeavyVehiclesWorld_Production.apk` (38.04 MB, signed with `HVW_Production.keystore`).
+  - Cryptographic checksum calculated and recorded: SHA-256 `F7F699F9FD398B1BE1B9178C3C188B473B9227A3C9FCCE1A9522B5FAF9893A50`.
+
+**New code:**
+```csharp
+// HVW_ReleaseValidator.cs - Pre-Release Validation Suite
+var (passCount, failCount, totalChecks, failDetails) = AndroidBuildValidator.RunValidation();
+if (failCount > 0) throw new Exception($"AndroidBuildValidator failed: {failCount}/{totalChecks} failed.\n{failDetails}");
+
+// HVW_WorldInitializer.cs - Pristine HUD & Tap-to-Debug Trigger
+#if !DEVELOPMENT_BUILD && !UNITY_EDITOR
+dbgBtn.SetActive(false);
+#endif
+var stampBtn = stampText.gameObject.AddComponent<Button>();
+stampBtn.transition = Selectable.Transition.None;
+stampBtn.onClick.AddListener(() => { if (_diagOverlay != null) _diagOverlay.Toggle(); });
+```
+
+**Why:**
+Phase 4 core requirement: Complete rigorous pre-release validation, remove/hide diagnostics debug buttons for release, package the signed production release APK with verified checksums, and update all project documentation.
+
+*Previous code:*
+```csharp
+// In earlier builds, Btn_ToggleDBG remained visible on release builds.
+// Build validation was run through scattered individual menu items without a consolidated batch runner.
+// bundleVersionCode was 5 (Build #5).
+```
+
+**Related to:** Phase 4, Production Release, Signed APK, Android Build Validator, Release Keystore, HUD Polish, Secret Debug Trigger, SHA-256 Checksum
+---
