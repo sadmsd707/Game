@@ -118,6 +118,14 @@ namespace HeavyVehiclesWorld.Systems
                 lightGo.transform.rotation = Quaternion.Euler(48f, -35f, 0f);
             }
 
+            // Remove legacy Ground plane if present (obsolete built-in Standard plane)
+            var oldGround = GameObject.Find("Ground");
+            if (oldGround != null)
+            {
+                if (Application.isPlaying) Destroy(oldGround);
+                else DestroyImmediate(oldGround);
+            }
+
             // Ground Terrain System (4 PBR TerrainLayers: Grass, Dirt, Asphalt, Rock)
             var terrainGo = GameObject.Find("Terrain");
             if (terrainGo == null)
@@ -172,13 +180,22 @@ namespace HeavyVehiclesWorld.Systems
             return mat;
         }
 
+        public static Material LoadOrSafeMaterial(string assetPath, string name, Color fallbackColor, float metallic = 0.05f, float smoothness = 0.2f)
+        {
+#if UNITY_EDITOR
+            var mat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(assetPath);
+            if (mat != null) return mat;
+#endif
+            return CreateSafeMaterial(name, fallbackColor, metallic, smoothness);
+        }
+
         private void BuildRoadTrack()
         {
             var roadRoot = new GameObject("RoadNetwork");
             var vis = HVW_VisualSystem.Instance;
-            var asphaltMat = (vis != null && vis.asphaltRoadPBR != null) ? vis.asphaltRoadPBR : CreateSafeMaterial("M_Road_Asphalt", new Color(0.18f, 0.18f, 0.20f), 0.05f, 0.2f);
-            var stripeMat  = CreateSafeMaterial("M_Road_Stripe", new Color(0.95f, 0.85f, 0.15f), 0.1f, 0.3f);
-            var curbMat    = (vis != null && vis.concreteCurbsPBR != null) ? vis.concreteCurbsPBR : CreateSafeMaterial("M_Road_Curb", new Color(0.85f, 0.25f, 0.25f), 0.05f, 0.2f);
+            var asphaltMat = (vis != null && vis.asphaltRoadPBR != null) ? vis.asphaltRoadPBR : LoadOrSafeMaterial("Assets/Materials/M_PBR_Asphalt_Road.mat", "M_Road_Asphalt", new Color(0.18f, 0.18f, 0.20f), 0.05f, 0.2f);
+            var stripeMat  = LoadOrSafeMaterial("Assets/Materials/M_PBR_Road_Stripe.mat", "M_Road_Stripe", new Color(0.95f, 0.85f, 0.15f), 0.1f, 0.3f);
+            var curbMat    = (vis != null && vis.concreteCurbsPBR != null) ? vis.concreteCurbsPBR : LoadOrSafeMaterial("Assets/Materials/M_PBR_Concrete_Curbs.mat", "M_Road_Curb", new Color(0.85f, 0.25f, 0.25f), 0.05f, 0.2f);
 
             // Main Straight Road (North-South) - 400m long, 14m wide
             CreateRoadSegment(roadRoot, "Road_MainStraight", new Vector3(0, 0.02f, 0), new Vector3(14f, 0.05f, 400f), asphaltMat, stripeMat, curbMat);
@@ -186,13 +203,14 @@ namespace HeavyVehiclesWorld.Systems
             // East-West Cross Road - 300m long, 14m wide
             CreateRoadSegment(roadRoot, "Road_CrossRoad", new Vector3(0, 0.02f, 50f), new Vector3(300f, 0.05f, 14f), asphaltMat, stripeMat, curbMat);
 
-            // Construction Site Ground (Dirt / Mud Brown)
+            // Construction Site Ground (Natural Earth Brown / Dirt - NOT RED)
             var constrGround = GameObject.CreatePrimitive(PrimitiveType.Cube);
             constrGround.name = "Zone_ConstructionDirt";
             constrGround.transform.SetParent(roadRoot.transform);
             constrGround.transform.position = new Vector3(35f, 0.03f, 35f);
             constrGround.transform.localScale = new Vector3(60f, 0.05f, 60f);
-            constrGround.GetComponent<Renderer>().sharedMaterial = (vis != null && vis.constructionPropsPBR != null) ? vis.constructionPropsPBR : CreateSafeMaterial("M_ConstructionDirt", new Color(0.55f, 0.38f, 0.22f));
+            var constrMat = LoadOrSafeMaterial("Assets/Materials/M_PBR_ConstructionDirt.mat", "M_ConstructionDirt", new Color(0.48f, 0.36f, 0.22f), 0.0f, 0.15f);
+            constrGround.GetComponent<Renderer>().sharedMaterial = constrMat;
 
             // Farm Field (Golden Wheat Yellow/Amber)
             var farmGround = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -200,7 +218,7 @@ namespace HeavyVehiclesWorld.Systems
             farmGround.transform.SetParent(roadRoot.transform);
             farmGround.transform.position = new Vector3(45f, 0.03f, -40f);
             farmGround.transform.localScale = new Vector3(80f, 0.05f, 80f);
-            farmGround.GetComponent<Renderer>().sharedMaterial = CreateSafeMaterial("M_WheatField", new Color(0.82f, 0.68f, 0.25f));
+            farmGround.GetComponent<Renderer>().sharedMaterial = LoadOrSafeMaterial("Assets/Materials/M_PBR_WheatField.mat", "M_WheatField", new Color(0.82f, 0.68f, 0.25f), 0.0f, 0.2f);
 
             // Crop Manager & Wheat Crop Field with cuttable stalks
             var cropMgrGo = new GameObject("CropManager");
@@ -223,7 +241,7 @@ namespace HeavyVehiclesWorld.Systems
             quarryGround.transform.SetParent(roadRoot.transform);
             quarryGround.transform.position = new Vector3(-35f, 0.03f, 35f);
             quarryGround.transform.localScale = new Vector3(60f, 0.05f, 60f);
-            quarryGround.GetComponent<Renderer>().sharedMaterial = CreateSafeMaterial("M_QuarryGravel", new Color(0.40f, 0.40f, 0.42f));
+            quarryGround.GetComponent<Renderer>().sharedMaterial = LoadOrSafeMaterial("Assets/Materials/M_PBR_QuarryGravel.mat", "M_QuarryGravel", new Color(0.40f, 0.40f, 0.42f), 0.05f, 0.2f);
         }
 
         private void CreateRoadSegment(GameObject parent, string name, Vector3 pos, Vector3 scale, Material roadMat, Material stripeMat, Material curbMat)
@@ -277,14 +295,15 @@ namespace HeavyVehiclesWorld.Systems
                 if (col == null) col = cone.AddComponent<CapsuleCollider>();
             }
 
-            // Dirt Mounds for Excavator & JCB (with colliders)
+            // Dirt Mounds for Excavator & JCB (smooth, natural low-profile mounds)
+            var moundMat = LoadOrSafeMaterial("Assets/Materials/M_PBR_Mound.mat", "M_Mound", new Color(0.44f, 0.32f, 0.18f), 0.0f, 0.15f);
             for (int i = 0; i < 3; i++)
             {
                 var mound = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 mound.transform.SetParent(propsRoot.transform);
-                mound.transform.position = new Vector3(28f + i * 8f, 0.8f, 40f + i * 5f);
-                mound.transform.localScale = new Vector3(7f, 3.5f, 7f);
-                mound.GetComponent<Renderer>().sharedMaterial = CreateSafeMaterial("M_Mound", new Color(0.48f, 0.32f, 0.18f));
+                mound.transform.position = new Vector3(28f + i * 8f, 0.25f, 40f + i * 5f);
+                mound.transform.localScale = new Vector3(4.5f, 1.0f, 4.5f);
+                mound.GetComponent<Renderer>().sharedMaterial = moundMat;
                 var col = mound.GetComponent<SphereCollider>();
                 if (col == null) col = mound.AddComponent<SphereCollider>();
             }

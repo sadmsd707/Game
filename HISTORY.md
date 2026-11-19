@@ -1440,3 +1440,113 @@ Phase 1 core requirement: All six vehicles failed to drive via touch UI on devic
 
 **Related to:** Phase 1, Drivability, Wheel Physics, Touch Input Path, JCB Stabilizers, Camera Occlusion, Dynamic HUD
 ---
+
+
+### Change #41 | 2026-11-20 03:30
+**Files changed:**
+- Assets/DefaultVolumeProfile.asset (MODIFIED)
+- Assets/Editor/HVW_SceneGenerator.cs (MODIFIED)
+- Assets/Resources/hvw_build_info.json (MODIFIED)
+- Assets/Scenes/MainWorld.unity (MODIFIED)
+- Assets/Scripts/Systems/HVW_VisualSystem.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/UniversalRenderPipelineGlobalSettings.asset (MODIFIED)
+- ProjectSettings/GraphicsSettings.asset (MODIFIED)
+- ProjectSettings/ProjectSettings.asset (MODIFIED)
+- ProjectSettings/QualitySettings.asset (MODIFIED)
+- Assets/Editor/HVW_RenderingValidation.cs (NEW)
+- Assets/Materials/M_PBR_Asphalt_Road.mat (NEW)
+- Assets/Materials/M_PBR_Car_Body.mat (NEW)
+- Assets/Materials/M_PBR_Concrete_Curbs.mat (NEW)
+- Assets/Materials/M_PBR_ConstructionDirt.mat (NEW)
+- Assets/Materials/M_PBR_Excavator_Body.mat (NEW)
+- Assets/Materials/M_PBR_Glass.mat (NEW)
+- Assets/Materials/M_PBR_Harvester_Body.mat (NEW)
+- Assets/Materials/M_PBR_JCB_Body.mat (NEW)
+- Assets/Materials/M_PBR_MetalParts.mat (NEW)
+- Assets/Materials/M_PBR_Mound.mat (NEW)
+- Assets/Materials/M_PBR_QuarryGravel.mat (NEW)
+- Assets/Materials/M_PBR_Road_Stripe.mat (NEW)
+- Assets/Materials/M_PBR_Rubber_Tires.mat (NEW)
+- Assets/Materials/M_PBR_Skybox.mat (NEW)
+- Assets/Materials/M_PBR_Tractor_Body.mat (NEW)
+- Assets/Materials/M_PBR_TreeLeaves.mat (NEW)
+- Assets/Materials/M_PBR_TreeWood.mat (NEW)
+- Assets/Materials/M_PBR_Truck_Body.mat (NEW)
+- Assets/Materials/M_PBR_WheatField.mat (NEW)
+- Assets/Settings/HVW_ShaderVariants.shadervariants (NEW)
+- Assets/Settings/URP_Mobile_Asset.asset (NEW)
+- Assets/Settings/URP_Mobile_Renderer.asset (NEW)
+- Assets/Terrain/MainWorld_TerrainData.asset (NEW)
+- Assets/Terrain/M_Terrain_Lit.mat (NEW)
+- Assets/Terrain/Layer_Grass.terrainlayer (NEW)
+- Assets/Terrain/Layer_Dirt.terrainlayer (NEW)
+- Assets/Terrain/Layer_Asphalt.terrainlayer (NEW)
+- Assets/Terrain/Layer_Rock.terrainlayer (NEW)
+- Assets/Terrain/Tex_Grass_Albedo.png (NEW)
+- Assets/Terrain/Tex_Dirt_Albedo.png (NEW)
+- Assets/Terrain/Tex_Asphalt_Albedo.png (NEW)
+- Assets/Terrain/Tex_Rock_Albedo.png (NEW)
+- Assets/Terrain/Tex_NormalMap.png (NEW)
+- Builds/Screenshots/Overview_Horizon_1920x1080.png (NEW)
+- Builds/Screenshots/Construction_Mounds_1920x1080.png (NEW)
+- Builds/Screenshots/Quarry_RockZone_1920x1080.png (NEW)
+- Builds/Screenshots/HUD_Toolbar_1920x1080_1920x1080.png (NEW)
+- Builds/Screenshots/HUD_Toolbar_1280x576_1280x576.png (NEW)
+- Builds/Screenshots/HUD_Toolbar_2400x1080_2400x1080.png (NEW)
+
+**What changed:**
+- Phase 2 - Fix The Rendering (Pink, Red, White & Visual Artifacts Complete Resolution):
+  - Created and assigned dedicated URP Mobile Pipeline Asset (`Assets/Settings/URP_Mobile_Asset.asset`) paired with `UniversalRendererData` (`Assets/Settings/URP_Mobile_Renderer.asset`). Configured HDR on, 4x MSAA, Render Scale 1.0, 100m soft shadows (2 cascades), ACES tonemapping. Assigned to `GraphicsSettings.defaultRenderPipeline` and across all quality levels in `QualitySettings.renderPipeline`.
+  - Configured `GraphicsSettings.m_AlwaysIncludedShaders` with core URP shaders (`Universal Render Pipeline/Lit`, `Universal Render Pipeline/Terrain/Lit`, `Universal Render Pipeline/Unlit`, `Universal Render Pipeline/Particles/Unlit`, `Skybox/Procedural`, `Skybox/Panoramic`) and generated `Assets/Settings/HVW_ShaderVariants.shadervariants` preloading keywords `_NORMALMAP`, `_MAIN_LIGHT_SHADOWS`, `_SHADOWS_SOFT`, `_TERRAIN_NORMAL_MAP` to prevent runtime Android shader variant stripping.
+  - Pre-baked 19 static PBR materials into `Assets/Materials/` using `Universal Render Pipeline/Lit` and `Skybox/Procedural`. Assigned natural earth-brown tones (`Color(0.48f, 0.36f, 0.22f)`) to construction ground, completely eliminating the bright red ground bug.
+  - Pre-baked static terrain in `Assets/Terrain/`: generated 4 PBR textures with normal maps, 4 `.terrainlayer` assets (`Layer_Grass`, `Layer_Dirt`, `Layer_Asphalt`, `Layer_Rock`), `M_Terrain_Lit.mat`, and `MainWorld_TerrainData.asset` (800m x 50m x 800m) with baked splatmaps (road=asphalt, construction=dirt, quarry=rock, farm=dirt/wheat, landscape=grass).
+  - Destroyed the obsolete 5,000m x 5,000m legacy `Ground` plane in `MainWorld.unity` which used the Built-in `Default-Material` (`Standard` shader), the root cause of magenta/pink stripes and white edge patches.
+  - Replaced oversized sphere blobs with low-profile, smooth mounds (`4.5m x 1.0m x 4.5m`, `y = 0.25m`) textured with `M_PBR_Mound.mat`.
+  - Fixed the yellow-green horizon band by updating skybox `_GroundColor` to natural horizon haze (`0.68, 0.72, 0.78`) and enabling exponential distance fog (`density = 0.0015f`, `color = (0.70, 0.78, 0.86)`).
+  - Authored and ran automated screenshot verification suite (`HVW_RenderingValidation.cs`) capturing 6 camera views: achieved **0 magenta pixels (0.00%) and 0 blank-white patch pixels (0.00%)** across all views.
+  - Verified UI toolbar readability at 1280x576, 1920x1080, and 2400x1080 resolutions: all 8 top-bar buttons show clear, readable text with `BestFit` auto-sizing.
+  - Built Android Production APK (Build #4, `bundleVersionCode: 4`, `39.88 MB`, SHA-256: `999A64811FC08E13A24D5181BBB169E12B86F719DC2D98AA19531304820FBA69`).
+
+**New code:**
+```csharp
+// HVW_SceneGenerator.cs - Pre-Baked URP Mobile Pipeline Asset & Quality assignment
+var rendererData = ScriptableObject.CreateInstance<UniversalRendererData>();
+AssetDatabase.CreateAsset(rendererData, "Assets/Settings/URP_Mobile_Renderer.asset");
+
+var urpAsset = UniversalRenderPipelineAsset.Create(rendererData);
+urpAsset.supportsHDR = true;
+urpAsset.msaaSampleCount = 4;
+urpAsset.renderScale = 1.0f;
+urpAsset.shadowDistance = 100f;
+AssetDatabase.CreateAsset(urpAsset, "Assets/Settings/URP_Mobile_Asset.asset");
+
+GraphicsSettings.defaultRenderPipeline = urpAsset;
+for (int i = 0; i < QualitySettings.names.Length; i++)
+{
+    QualitySettings.SetQualityLevel(i, false);
+    QualitySettings.renderPipeline = urpAsset;
+}
+
+// HVW_WorldInitializer.cs - Natural earth brown construction ground & removal of legacy Ground
+constrGround.GetComponent<Renderer>().sharedMaterial =
+    AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/M_PBR_ConstructionDirt.mat");
+
+var legacyGround = GameObject.Find("Ground");
+if (legacyGround != null) SafeDestroy(legacyGround);
+```
+
+**Why:**
+Phase 2 core requirement: Phone recording exhibited severe visual artifacts including hot magenta/pink stripes and white edge patches (caused by missing URP pipeline asset assignment falling back to Built-in RP and obsolete 5000m Ground plane with Standard shader), bright red ground in construction area (caused by hazard orange visual material assignment), oversized dark-brown blob mounds (caused by unscaled primitive spheres), yellow-green horizon line (caused by skybox ground color mismatch), and missing top bar text on high-density displays.
+
+*Previous code:*
+```csharp
+// GraphicsSettings.defaultRenderPipeline and QualitySettings.renderPipeline were null ({fileID: 0}).
+// MainWorld.unity contained a 5000m x 5000m Ground plane using Default-Material (Built-in Standard shader -> magenta in URP).
+// constrGround was assigned vis.constructionPropsPBR (bright orange/red Color(1.0f, 0.45f, 0.05f)).
+// Dirt mounds were procedural 7m x 3.5m x 7m spheres.
+// Skybox ground color was olive yellow Color(0.26f, 0.34f, 0.22f) without distance fog.
+```
+
+**Related to:** Phase 2, URP Pipeline Asset, Shader Stripping Prevention, Static PBR Materials, Terrain Layers, Zero-Magenta Validation, Skybox & Fog, UI Button Text
+---

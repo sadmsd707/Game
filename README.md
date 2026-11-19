@@ -3,7 +3,7 @@
 [![Unity](https://img.shields.io/badge/Unity-6000.6.9f1%20(Unity%206)-blue.svg)](https://unity.com/)
 [![Render Pipeline](https://img.shields.io/badge/URP-Universal%20Render%20Pipeline-lightgrey.svg)](https://unity.com/srp/universal-render-pipeline)
 [![Platform](https://img.shields.io/badge/Platform-Android%20(ARM64%20IL2CPP)-green.svg)](https://www.android.com/)
-[![Version](https://img.shields.io/badge/Release-v1.36%20(Production)-orange.svg)](https://github.com/sadmsd707/Game)
+[![Version](https://img.shields.io/badge/Release-v1.36--b4%20(Build%20%234)-orange.svg)](https://github.com/sadmsd707/Game)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE.md)
 
 A production-ready open-world mobile simulation game built with **Unity 6 (6000.6.9f1)** and the **Universal Render Pipeline (URP)**. Explore an expansive world featuring a multi-lane highway, construction zones, agricultural crop fields, and quarry dig sites across six drivable, physically-calibrated heavy vehicles.
@@ -14,8 +14,9 @@ A production-ready open-world mobile simulation game built with **Unity 6 (6000.
 
 - **Artifact Name:** `HeavyVehiclesWorld_Production.apk`
 - **Location:** `Builds/Android/HeavyVehiclesWorld_Production.apk`
-- **File Size:** 35.02 MB (36,720,312 bytes)
-- **SHA-256 Checksum:** `73fffd94402d9c702ef69a735daedc0edfc8846547b05340c78e00a5f1f639ab`
+- **Build Number:** Build #4 (`bundleVersionCode: 4`, `v1.36-b4`)
+- **File Size:** 38.03 MB (39,880,068 bytes)
+- **SHA-256 Checksum:** `999A64811FC08E13A24D5181BBB169E12B86F719DC2D98AA19531304820FBA69`
 - **Architecture:** ARM64 (`v8a`, IL2CPP)
 - **Minimum OS:** Android 8.0 Oreo (API Level 26)
 - **Target OS:** Android 14 (API Level 34)
@@ -172,6 +173,38 @@ Every modification in project development is tracked below, corresponding direct
   - SHA-256 cryptographic checksum verified: `73fffd94402d9c702ef69a735daedc0edfc8846547b05340c78e00a5f1f639ab`.
   - Comprehensive on-phone test checklist provided.
 
+### Version 1.37 | Change #38
+- **Repository Documentation & Version History Upgrade:**
+  - Upgraded README to reflect Version 1.36 Production Release specifications, Unity 6 (6000.6.9f1) requirements, and Android 8.0+ / ARM64 IL2CPP architecture.
+  - Formulated complete Version History & Changelog mapping every change in `HISTORY.md` sequentially from Version 1.0 through Version 1.36.
+
+### Version 1.38 | Change #39 (Phase 0 - Safety Net)
+- **HUD Build Stamp & Real-Time Diagnostics Overlay:**
+  - Created `Assets/Resources/hvw_build_info.json` and `HVW_BuildInfo.cs` providing live compile-time HUD build stamping (`BUILD #<n> | <date time> | <version>`).
+  - Implemented 4Hz release-capable `HVW_DiagnosticsOverlay.cs` toggled via "🔧 DBG" button with 7 panels (System & Pipeline, Active Vehicle & Rigidbody, Processed Inputs, WheelColliders, EventSystem Touch States, Rendering Health, and Log Ring Buffer).
+  - Automated `bundleVersionCode` incrementation in `HVW_BatchBuild.cs`.
+
+### Version 1.39 | Change #40 (Phase 1 - Make Every Vehicle Drive)
+- **Touch-Driven Vehicle Physics & Drivability Resolution:**
+  - Authored comprehensive touch-path integration test (`Assets/Editor/HVW_TouchPathTest.cs`) exercising real touch pointer events on Gas, Brake, and Steer controls across flat ground, 10° slope climb, and sharp steering stability.
+  - Eliminated rogue solid colliders generated on wheel visual cylinder meshes; replaced delayed destruction with immediate removal and automatic non-wheel collider stripping in `HVW_WorldInitializer.cs`.
+  - Added delta time safety fallback in `HandleMobileInputSmoothing()` preventing frozen inputs during zero-delta frames.
+  - Added stabilizer auto-retraction in `JCBController.cs` after dig strokes so vehicles are never drive-inhibited.
+  - Updated `HVW_FollowCamera.cs` `SphereCastAll` to exclude target vehicle and child colliders, eliminating cabin clipping.
+  - Synchronized HUD speedometer, gear indicator, and vehicle labels dynamically on vehicle switch, with text auto-sizing (`BestFit`).
+
+### Version 1.40 | Change #41 (Phase 2 - Fix The Rendering)
+- **URP Pipeline Assets, Static PBR Materials, Static Terrain Layers & Zero-Magenta Validation:**
+  - Created and assigned dedicated URP Mobile Pipeline Asset (`Assets/Settings/URP_Mobile_Asset.asset`) and Renderer (`Assets/Settings/URP_Mobile_Renderer.asset`) across `GraphicsSettings` and all `QualitySettings` levels.
+  - Added core URP shaders to `GraphicsSettings.m_AlwaysIncludedShaders` and generated `Assets/Settings/HVW_ShaderVariants.shadervariants` preloading keywords `_NORMALMAP`, `_MAIN_LIGHT_SHADOWS`, `_SHADOWS_SOFT`, `_TERRAIN_NORMAL_MAP` to prevent runtime Android shader variant stripping.
+  - Pre-baked 19 static PBR materials in `Assets/Materials/` and 4 static terrain layers with PBR textures and normal maps in `Assets/Terrain/`.
+  - Destroyed obsolete 5,000m x 5,000m legacy `Ground` plane in `MainWorld.unity` using Built-in `Standard` shader, completely eliminating magenta stripes and white edge patches.
+  - Replaced oversized sphere blobs with low-profile, smooth mounds (`4.5m x 1.0m x 4.5m`) textured with `M_PBR_Mound.mat`.
+  - Fixed yellow-green horizon line by tuning skybox ground color and introducing exponential distance fog.
+  - Executed automated screenshot verification suite (`HVW_RenderingValidation.cs`) capturing 6 camera views: achieved **0 magenta pixels (0.00%) and 0 blank-white patch pixels (0.00%)**.
+  - Verified readable top-bar button text across 1280x576, 1920x1080, and 2400x1080 resolutions.
+  - Built Android Production APK Build #4 (`bundleVersionCode: 4`, 39.88 MB, SHA-256: `999A64811FC08E13A24D5181BBB169E12B86F719DC2D98AA19531304820FBA69`).
+
 ---
 
 ## 🎮 Mobile Touch Controls
@@ -186,11 +219,12 @@ The mobile UI adapts automatically to any aspect ratio with non-overlapping touc
 | **Bottom-Right** | `Btn_Handbrake` (Yellow) | High-torque parking handbrake (locks driven wheels) |
 | **Right Side** | `Btn_VehicleAction` (Orange) | Vehicle Action 1: Tipper bed dump / Plough raise-lower / Loader / Harvester header |
 | **Right Side** | `Btn_VehicleAction2` (Blue) | Vehicle Action 2: Outriggers / Backhoe dig / Excavator 360° slew / Unload auger |
-| **Top Bar (Row 1)**| `Btn_Select_Car` .. `Harvester` | Instant one-tap vehicle selector buttons |
+| **Top Bar (Row 1)**| `Btn_Select_Car` .. `Harvester` | Instant one-tap vehicle selector buttons (auto-scaled text) |
 | **Top Bar (Row 1)**| `Btn_Settings` (Gear) | Opens in-game Graphics Quality & FPS Cap settings modal |
 | **Top Bar (Row 1)**| `Btn_CamView` (Camera) | Toggles chase camera framing and zoom angles |
 | **Top Bar (Row 1)**| `Btn_ResetVeh` (Reset) | Rights vehicle upright if tipped over |
-| **Top Bar (Row 2)**| `HUD_Dashboard` | Real-time digital speedometer (KM/H), gear state, and vehicle model telemetry |
+| **Top Bar (Row 1)**| `Btn_ToggleDBG` (Wrench) | Toggles real-time 4Hz release diagnostics telemetry overlay |
+| **Top Bar (Row 2)**| `HUD_Dashboard` | Real-time digital speedometer (KM/H), gear state, vehicle model telemetry, and compile build stamp |
 
 ---
 

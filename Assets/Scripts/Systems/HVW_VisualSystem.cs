@@ -126,7 +126,7 @@ namespace HeavyVehiclesWorld.Systems
                     skyMat.SetFloat("_SunSize", 0.04f);
                     skyMat.SetFloat("_AtmosphereThickness", 1.0f);
                     skyMat.SetColor("_SkyTint", new Color(0.42f, 0.65f, 0.90f));
-                    skyMat.SetColor("_GroundColor", new Color(0.26f, 0.34f, 0.22f));
+                    skyMat.SetColor("_GroundColor", new Color(0.68f, 0.72f, 0.78f));
                     skyMat.SetFloat("_Exposure", 1.0f);
                     RenderSettings.skybox = skyMat;
                 }
@@ -146,11 +146,16 @@ namespace HeavyVehiclesWorld.Systems
                 }
             }
 
-            // Balanced Trilight Ambient (Natural Daylight)
+            // Balanced Trilight Ambient (Natural Daylight without yellow horizon tint)
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor     = new Color(0.45f, 0.58f, 0.75f);
-            RenderSettings.ambientEquatorColor = new Color(0.38f, 0.44f, 0.50f);
-            RenderSettings.ambientGroundColor  = new Color(0.24f, 0.28f, 0.20f);
+            RenderSettings.ambientSkyColor     = new Color(0.55f, 0.65f, 0.78f);
+            RenderSettings.ambientEquatorColor = new Color(0.45f, 0.50f, 0.56f);
+            RenderSettings.ambientGroundColor  = new Color(0.30f, 0.32f, 0.35f);
+
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
+            RenderSettings.fogColor = new Color(0.70f, 0.78f, 0.86f);
+            RenderSettings.fogDensity = 0.0015f;
         }
 
         // ══════════════════════════════════════════════════════════════════════
