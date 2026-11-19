@@ -1686,3 +1686,49 @@ Phase 4 core requirement: Complete rigorous pre-release validation, remove/hide 
 
 **Related to:** Phase 4, Production Release, Signed APK, Android Build Validator, Release Keystore, HUD Polish, Secret Debug Trigger, SHA-256 Checksum
 ---
+
+### Change #44 | 2026-11-20 | Step 0 — Chase Camera Anti-Clip Fix + Debug Photo Camera
+**Files changed:**
+- `Assets/Scripts/Systems/HVW_FollowCamera.cs` (MODIFIED)
+- `Assets/Scripts/Systems/HVW_PhotoCamera.cs` (MODIFIED — logic corrected)
+- `Assets/Scripts/Systems/HVW_WorldInitializer.cs` (MODIFIED)
+- `HISTORY.md` (this entry)
+
+**What changed:**
+
+**a) Camera anti-clip fix (HVW_FollowCamera.cs)**
+- Added `HashSet<Collider> _vehicleColliders` field populated via `GetComponentsInChildren<Collider>(true)` on the target vehicle root — rebuilt every time `SetTarget()` is called.
+- SphereCastAll occlusion loop now excludes by **Collider instance** (`_vehicleColliders.Contains(h.collider)`) instead of the previous transform-hierarchy check which was failing for some child collider configurations.
+- Added hard minimum distance clamp (`MIN_HARD_DIST = 3.5f`): after all spherecast math, the camera is pushed back if closer than 3.5 m to the vehicle pivot. This is the final safety net that prevents "grey wall" clipping regardless of wall proximity.
+- Added `NotifyVehicleChanged(Transform)` alias for `SetTarget()` so WorldInitializer can call it explicitly on vehicle switch.
+
+**b) Debug Photo Camera (HVW_PhotoCamera.cs)**
+- Orbit camera at 3/4 front view: 45° azimuth, 25° elevation, 6 m radius from vehicle centre.
+- Single-finger drag (Android) or mouse drag (Editor/Windows) to rotate orbit; elevation clamped 5°–80°.
+- `Activate(Transform)` / `Deactivate()` API; `IsActive` property.
+- Added to `PhotoCamera` GameObject in `SetupFollowCamera()` — Camera component added before `HVW_PhotoCamera` to satisfy `[RequireComponent(typeof(Camera))]` ordering.
+- Fixed earlier incarnation which added Camera after the component (would have thrown an error at runtime).
+
+**c) WorldInitializer wiring**
+- `TogglePhotoCamera()` method added: enables photo cam + disables follow cam, or vice versa.
+- PHOTO button added to HUD top bar (green, anchored top-right, second row).
+- `SelectVehicle()` already re-targets photo cam when active (line 1464).
+
+**d) Landscape orientation**
+- `ProjectSettings.asset` already has `defaultScreenOrientation: 3` (LandscapeLeft) and both portrait variants disabled. No code change needed — was already correct.
+
+**Why:**
+- Phone video showed camera sitting inside / against vehicle body. Root cause: collider exclusion checked transform hierarchy only, which missed some compound collider configurations. Hard minimum distance clamp is the final guarantee.
+- Photo camera is required to visually inspect vehicle model quality when real .fbx assets are dropped in Step 1.
+
+*Previous code (HVW_FollowCamera):*
+```csharp
+// Old exclusion check — insufficient for compound colliders
+if (h.transform == target || h.transform.IsChildOf(target)) continue;
+if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
+// No hard minimum distance clamp — camera could still clip at 3.2f minimum
+```
+
+**Related to:** Step 0 (Graphics art pipeline), Change #43
+---
+

@@ -23,6 +23,7 @@ namespace HeavyVehiclesWorld.Systems
         public VehicleController ActiveVehicle => _activeVehicle;
         private HVW_DiagnosticsOverlay _diagOverlay;
         private HVW_FollowCamera _followCamera;
+        private HVW_PhotoCamera _photoCamera;
         private Canvas _mobileCanvas;
         private Text _speedometerText;
         private Text _gearText;
@@ -942,6 +943,17 @@ namespace HeavyVehiclesWorld.Systems
             cam.fieldOfView = 60f;
             cam.nearClipPlane = 0.3f;
             cam.farClipPlane = 1000f;
+
+            // Setup Photo Camera on a separate GameObject.
+            // Camera must be added BEFORE HVW_PhotoCamera (RequireComponent order).
+            var photoCamGo  = new GameObject("PhotoCamera");
+            var photoCam    = photoCamGo.AddComponent<Camera>();   // ← Camera first
+            photoCam.enabled      = false;
+            photoCam.clearFlags   = CameraClearFlags.Skybox;
+            photoCam.fieldOfView  = 55f;
+            photoCam.nearClipPlane = 0.3f;
+            photoCam.farClipPlane  = 1000f;
+            _photoCamera = photoCamGo.AddComponent<HVW_PhotoCamera>(); // ← then PhotoCamera
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -1057,6 +1069,12 @@ namespace HeavyVehiclesWorld.Systems
                 new Vector2(1f, 1f), new Vector2(-48f, -22f), new Vector2(76f, 30f),
                 new Color(0.35f, 0.35f, 0.40f, 0.90f),
                 () => { ResetActiveVehicle(); });
+
+            // Photo Camera Button (Top-Right, Row 1) — after RESET
+            CreateClickButton(canvasGo, "Btn_PhotoCam", "PHOTO",
+                new Vector2(1f, 1f), new Vector2(-130f, -60f), new Vector2(76f, 30f),
+                new Color(0.20f, 0.65f, 0.35f, 0.90f),
+                () => { TogglePhotoCamera(); });
 
             // ── Speedometer & Dashboard HUD (Row 2: Y = -76f, strictly below Row 1) ───
             var hudPanel = new GameObject("HUD_Dashboard");
@@ -1443,6 +1461,12 @@ namespace HeavyVehiclesWorld.Systems
                 _followCamera.currentMode = HVW_FollowCamera.ViewMode.ThirdPerson;
             }
 
+            // If photo camera is active, re-target it to new vehicle
+            if (_photoCamera != null && _photoCamera.IsActive)
+            {
+                _photoCamera.Activate(_activeVehicle.transform);
+            }
+
             // Reset touch input state so new vehicle starts clean
             _currentSteer = 0f;
             _currentThrottle = 0f;
@@ -1604,6 +1628,29 @@ namespace HeavyVehiclesWorld.Systems
             Vector3 curPos = _activeVehicle.transform.position;
             _activeVehicle.transform.position = new Vector3(curPos.x, curPos.y + 1.2f, curPos.z);
             _activeVehicle.transform.rotation = Quaternion.Euler(0f, _activeVehicle.transform.eulerAngles.y, 0f);
+        }
+
+        /// <summary>
+        /// Toggle the debug photo orbit camera on/off.
+        /// When active, the follow camera is disabled so only one camera renders.
+        /// </summary>
+        private void TogglePhotoCamera()
+        {
+            if (_photoCamera == null) return;
+
+            if (_photoCamera.IsActive)
+            {
+                _photoCamera.Deactivate();
+                // Re-enable the follow camera
+                if (_followCamera != null) _followCamera.enabled = true;
+            }
+            else
+            {
+                if (_activeVehicle == null) return;
+                // Disable follow camera while photo mode is active
+                if (_followCamera != null) _followCamera.enabled = false;
+                _photoCamera.Activate(_activeVehicle.transform);
+            }
         }
     }
 }
