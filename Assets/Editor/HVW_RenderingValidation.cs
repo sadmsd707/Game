@@ -10,6 +10,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using HeavyVehiclesWorld.Systems;
 using HeavyVehiclesWorld.EditorTools;
+using HeavyVehiclesWorld.Editor;
 
 namespace HeavyVehiclesWorld.EditorTests
 {
@@ -26,6 +27,106 @@ namespace HeavyVehiclesWorld.EditorTests
             public float MagentaPercentage;
             public float WhitePatchPercentage;
             public bool Passed;
+        }
+
+        [MenuItem("Tools/HeavyVehiclesWorld/📸 Run Phase 3 Four-Tier Graphics Validation")]
+        public static void RunPhase3TierValidation()
+        {
+            int exitCode = 0;
+            Debug.Log("================================================================================");
+            Debug.Log("[PHASE 3 GRAPHICS VALIDATION] Four-Tier Quality Validation (Low, Med, High, Ultra)");
+            Debug.Log("================================================================================");
+
+            Directory.CreateDirectory("Builds/Screenshots");
+            var reports = new List<ScreenshotReport>();
+
+            try
+            {
+                // Ensure all quality tier URP assets and scene are configured
+                HVW_QualityTierSetup.SetupAllQualityTiers();
+                HVW_SceneGenerator.ConfigureAndSaveMainWorldScene();
+
+                string scenePath = "Assets/Scenes/MainWorld.unity";
+                var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+                if (!scene.IsValid()) throw new Exception($"Failed to open scene: {scenePath}");
+
+                var camGo = GameObject.Find("Main Camera");
+                if (camGo == null) throw new Exception("Main Camera not found in MainWorld.unity!");
+                var cam = camGo.GetComponent<Camera>();
+
+                // Scenic overview capturing world, vehicle spawn, terrain, road, and sky
+                cam.transform.position = new Vector3(0f, 6f, -14f);
+                cam.transform.rotation = Quaternion.Euler(14f, 0f, 0f);
+
+                string[] tierNames = new string[] { "Low", "Medium", "High", "Ultra" };
+                for (int t = 0; t < 4; t++)
+                {
+                    string tierName = tierNames[t];
+                    string urpPath = $"Assets/Settings/URP_Quality_{tierName}.asset";
+                    var urpAsset = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(urpPath);
+                    if (urpAsset == null) throw new Exception($"Missing URP Asset: {urpPath}");
+
+                    GraphicsSettings.defaultRenderPipeline = urpAsset;
+                    int unityQuality = t switch
+                    {
+                        0 => 1, // Low
+                        1 => 2, // Medium
+                        2 => 3, // High
+                        3 => 5, // Ultra
+                        _ => 3
+                    };
+                    QualitySettings.SetQualityLevel(unityQuality, true);
+                    QualitySettings.renderPipeline = urpAsset;
+
+                    // Apply anisotropic filtering per tier
+                    QualitySettings.anisotropicFiltering = (t >= 2) ? AnisotropicFiltering.ForceEnable : (t == 1 ? AnisotropicFiltering.Enable : AnisotropicFiltering.Disable);
+
+                    Debug.Log($"\n--- Testing Tier {tierName} (Quality {unityQuality}) ---");
+                    Debug.Log($"URP Asset: {urpAsset.name} | MSAA: {urpAsset.msaaSampleCount}x | Shadows: {QualitySettings.shadowDistance}m | RenderScale: {urpAsset.renderScale:F2}");
+
+                    string screenshotName = $"Tier_{tierName}_1920x1080";
+                    var report = CaptureAndAnalyzeView(cam, screenshotName, 1920, 1080);
+                    reports.Add(report);
+                }
+
+                // Summary Table
+                Debug.Log("\n================================================================================");
+                Debug.Log("📊 PHASE 3 FOUR-TIER GRAPHICS SCREENSHOT VALIDATION REPORT");
+                Debug.Log("================================================================================");
+                Debug.Log(string.Format("| {0,-24} | {1,-10} | {2,-14} | {3,-15} | {4,-6} |", "Tier View", "Resolution", "Magenta Pixels", "White Patches", "Status"));
+                Debug.Log("|--------------------------|------------|----------------|-----------------|--------|");
+
+                bool allPassed = true;
+                foreach (var r in reports)
+                {
+                    Debug.Log(string.Format("| {0,-24} | {1,5}x{2,-4} | {3,6} ({4:F2}%) | {5,6} ({6:F2}%) | {7,-6} |",
+                        r.ViewName, r.Width, r.Height, r.MagentaPixels, r.MagentaPercentage, r.WhitePatchPixels, r.WhitePatchPercentage, r.Passed ? "PASS" : "FAIL"));
+                    if (!r.Passed) allPassed = false;
+                }
+                Debug.Log("================================================================================");
+
+                if (allPassed)
+                {
+                    Debug.Log("🎉 ALL 4 GRAPHICS TIERS PASSED ZERO-ARTIFACT RENDERING VALIDATION!");
+                }
+                else
+                {
+                    Debug.LogError("⚠️ ONE OR MORE GRAPHICS TIERS FAILED VALIDATION!");
+                    exitCode = 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[PHASE 3 VALIDATION CRASH] ❌ Error: {ex.Message}\n{ex.StackTrace}");
+                exitCode = 1;
+            }
+            finally
+            {
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(exitCode);
+                }
+            }
         }
 
         [MenuItem("Tools/HeavyVehiclesWorld/📸 Run Phase 2 Rendering & Screenshot Validation")]

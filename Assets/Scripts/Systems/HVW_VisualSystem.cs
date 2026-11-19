@@ -65,6 +65,7 @@ namespace HeavyVehiclesWorld.Systems
             InitializePBRMaterials();
             ConfigureTerrainSystem();
             SetupLightProbeGrid();
+            SetupReflectionProbe();
             SetupPostProcessing();
             CheckMissingAssetsWarnings();
         }
@@ -726,6 +727,37 @@ namespace HeavyVehiclesWorld.Systems
             colorAdj.postExposure.Override(0.05f);
             colorAdj.contrast.Override(10.0f);
             colorAdj.saturation.Override(8.0f);
+
+            // 4. Subtle Vignette
+            if (!activeProfile.TryGet<Vignette>(out var vignette))
+            {
+                vignette = activeProfile.Add<Vignette>(true);
+            }
+            vignette.intensity.Override(0.22f);
+            vignette.smoothness.Override(0.35f);
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // 5b. REFLECTION PROBE (REALTIME / BAKED WORLD REFLECTIONS)
+        // ══════════════════════════════════════════════════════════════════════
+        public void SetupReflectionProbe()
+        {
+            var rpGo = GameObject.Find("ReflectionProbe_World");
+            if (rpGo == null)
+            {
+                rpGo = new GameObject("ReflectionProbe_World");
+            }
+
+            var rp = rpGo.GetComponent<ReflectionProbe>();
+            if (rp == null) rp = rpGo.AddComponent<ReflectionProbe>();
+
+            rp.transform.position = new Vector3(0f, 2.5f, 0f);
+            rp.size = new Vector3(400f, 100f, 400f);
+            rp.boxProjection = true;
+            rp.intensity = 0.85f;
+            rp.mode = ReflectionProbeMode.Realtime;
+            rp.refreshMode = ReflectionProbeRefreshMode.OnAwake;
+            rp.clearFlags = ReflectionProbeClearFlags.Skybox;
         }
 
         // ══════════════════════════════════════════════════════════════════════

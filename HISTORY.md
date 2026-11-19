@@ -1550,3 +1550,92 @@ Phase 2 core requirement: Phone recording exhibited severe visual artifacts incl
 
 **Related to:** Phase 2, URP Pipeline Asset, Shader Stripping Prevention, Static PBR Materials, Terrain Layers, Zero-Magenta Validation, Skybox & Fog, UI Button Text
 ---
+
+
+### Change #42 | 2026-11-20 03:55
+**Files changed:**
+- ASSET_INTEGRATION_GUIDE.md (MODIFIED)
+- Assets/Editor/HVW_RenderingValidation.cs (MODIFIED)
+- Assets/Editor/HVW_SceneGenerator.cs (MODIFIED)
+- Assets/Resources/hvw_build_info.json (MODIFIED)
+- Assets/Scenes/MainWorld.unity (MODIFIED)
+- Assets/Scripts/Systems/GraphicsSettingsManager.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_DiagnosticsOverlay.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_VisualSystem.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Terrain/Tex_Asphalt_Albedo.png.meta (MODIFIED)
+- Assets/Terrain/Tex_Dirt_Albedo.png.meta (MODIFIED)
+- Assets/Terrain/Tex_Grass_Albedo.png.meta (MODIFIED)
+- Assets/Terrain/Tex_NormalMap.png.meta (MODIFIED)
+- Assets/Terrain/Tex_Rock_Albedo.png.meta (MODIFIED)
+- ProjectSettings/ProjectSettings.asset (MODIFIED)
+- ProjectSettings/QualitySettings.asset (MODIFIED)
+- Assets/Editor/HVW_QualityTierSetup.cs (NEW)
+- Assets/Editor/HVW_TextureOptimizer.cs (NEW)
+- Assets/Settings/URP_Quality_Low.asset (NEW)
+- Assets/Settings/URP_Quality_Low_Renderer.asset (NEW)
+- Assets/Settings/URP_Quality_Medium.asset (NEW)
+- Assets/Settings/URP_Quality_Medium_Renderer.asset (NEW)
+- Assets/Settings/URP_Quality_High.asset (NEW)
+- Assets/Settings/URP_Quality_High_Renderer.asset (NEW)
+- Assets/Settings/URP_Quality_Ultra.asset (NEW)
+- Assets/Settings/URP_Quality_Ultra_Renderer.asset (NEW)
+- Assets/Resources/Settings/URP_Quality_Low.asset (NEW)
+- Assets/Resources/Settings/URP_Quality_Medium.asset (NEW)
+- Assets/Resources/Settings/URP_Quality_High.asset (NEW)
+- Assets/Resources/Settings/URP_Quality_Ultra.asset (NEW)
+- Builds/Screenshots/Tier_Low_1920x1080_1920x1080.png (NEW)
+- Builds/Screenshots/Tier_Medium_1920x1080_1920x1080.png (NEW)
+- Builds/Screenshots/Tier_High_1920x1080_1920x1080.png (NEW)
+- Builds/Screenshots/Tier_Ultra_1920x1080_1920x1080.png (NEW)
+
+**What changed:**
+- Phase 3 - High-Quality Graphics Complete Implementation:
+  - Created 4 dedicated Universal Render Pipeline assets with corresponding UniversalRendererData assets: `URP_Quality_Low` (MSAA off, 40m hard shadows), `URP_Quality_Medium` (2x MSAA, 60m soft shadows, 2 cascades), `URP_Quality_High` (4x MSAA, 100m soft shadows, 3 cascades, anisotropic filtering forced on), and `URP_Quality_Ultra` (4x MSAA, 120m soft shadows, 4 cascades, 1.15x render scale, SSAO Screen Space Ambient Occlusion feature enabled).
+  - Placed mirror copies in `Assets/Resources/Settings/` ensuring release builds dynamically load and hot-swap pipeline assets on Android hardware without missing asset references.
+  - Upgraded `GraphicsSettingsManager.cs`: implemented hardware RAM/GPU auto-detection at launch (<3.5GB -> Low, <5.5GB -> Medium, <7.5GB -> High, >=7.5GB -> Ultra), dynamic post-processing calibration (ACES tonemapping, subtle bloom, vignette, color grading), and manual override persistence (`GFX_Quality_UserOverride`).
+  - Updated in-game Settings modal in `HVW_WorldInitializer.cs`: replaced 3 buttons with 4 dedicated quality buttons (`LOW`, `MEDIUM`, `HIGH`, `ULTRA`), linking directly to `GraphicsSettingsManager.ApplyQuality`.
+  - Added world ReflectionProbe (`ReflectionProbe_World`, size 400x100x400) and LightProbeGroup (7x7x3 grid covering -120m to +120m) in `HVW_VisualSystem.cs` and `MainWorld.unity` for static GI and dynamic vehicle ambient reflections.
+  - Implemented `HVW_TextureOptimizer.cs` asset postprocessor and batch tool: configured Android platform overrides with `ASTC_4x4` for key vehicle textures, `ASTC_6x6` for terrain and environment textures, enabled mipmaps, enforced linear color on normal maps, and set `TextureImporterType.NormalMap`.
+  - Upgraded `HVW_DiagnosticsOverlay.cs`: added real-time display of URP MSAA, HDR state, shadow distance, shadow cascades, anisotropic filtering, and prominent Asset Presence Warning banner if any vehicle uses low-poly fallback geometry.
+  - Updated `ASSET_INTEGRATION_GUIDE.md`: added exact file names, folder paths, ASTC compression table, quality tier performance specifications, and fallback geometry architecture.
+  - Authored and ran `HVW_RenderingValidation.RunPhase3TierValidation()`: captured 1920x1080 screenshots across all 4 tiers, verifying **0 magenta pixels (0.00%) and 0 white patches (0.00%)** on every tier.
+  - Built Android Production APK (Build #5, `bundleVersionCode: 5`, `39.89 MB`, SHA-256: `4A6E9BE2BBE622B69500E6D445CC6A8C4F4C3E84AA081F11D8598EBA0433F879`).
+
+**New code:**
+```csharp
+// HVW_QualityTierSetup.cs - SSAO feature configuration on Ultra renderer
+var ssaoType = typeof(UniversalRendererData).Assembly.GetType("UnityEngine.Rendering.Universal.ScreenSpaceAmbientOcclusion");
+if (ssaoType != null)
+{
+    var ssaoInstance = ScriptableObject.CreateInstance(ssaoType) as ScriptableRendererFeature;
+    ssaoInstance.name = "ScreenSpaceAmbientOcclusion";
+    AssetDatabase.AddObjectToAsset(ssaoInstance, rendererData);
+    // ... added to m_RendererFeatures on URP_Quality_Ultra_Renderer
+}
+
+// GraphicsSettingsManager.cs - Hardware Auto-Detection & 4-Tier Switching
+public static QualityLevel DetectBestQualityLevel()
+{
+    int ramMB = SystemInfo.systemMemorySize;
+    if (ramMB < 3500) return QualityLevel.Low;
+    if (ramMB < 5500) return QualityLevel.Medium;
+    if (ramMB < 7500) return QualityLevel.High;
+    return QualityLevel.Ultra;
+}
+```
+
+**Why:**
+Phase 3 core requirement: Deliver production-grade visual fidelity across diverse Android hardware through 4 discrete quality tiers (Low/Medium/High/Ultra) with dedicated URP assets, hardware auto-selection, ASTC mobile texture compression, baked GI lighting with reflection probes and light probe groups, and automated zero-artifact screenshot verification.
+
+*Previous code:*
+```csharp
+// Single monolithic URP_Mobile_Asset used across all quality levels.
+// GraphicsSettingsManager lacked hardware auto-detection and lacked Ultra URP asset with SSAO.
+// Settings modal only offered 3 buttons (Low, Medium, High).
+// Textures lacked Android ASTC 4x4 / 6x6 platform overrides.
+// Scene lacked ReflectionProbe and LightProbeGroup initialization.
+```
+
+**Related to:** Phase 3, Quality Tiers, URP Pipeline Assets, SSAO, ASTC Textures, Light Probes, Reflection Probes, Hardware Auto-Detection, Settings Modal, Zero-Magenta Validation
+---

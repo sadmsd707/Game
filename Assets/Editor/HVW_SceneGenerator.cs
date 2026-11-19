@@ -544,8 +544,9 @@ namespace HeavyVehiclesWorld.EditorTools
             // 6. Global Post-Processing Volume
             visSys.SetupPostProcessing();
 
-            // 7. Light Probe Group
+            // 7. Light Probe Group & Reflection Probe
             visSys.SetupLightProbeGrid();
+            visSys.SetupReflectionProbe();
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);

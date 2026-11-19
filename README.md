@@ -3,7 +3,7 @@
 [![Unity](https://img.shields.io/badge/Unity-6000.6.9f1%20(Unity%206)-blue.svg)](https://unity.com/)
 [![Render Pipeline](https://img.shields.io/badge/URP-Universal%20Render%20Pipeline-lightgrey.svg)](https://unity.com/srp/universal-render-pipeline)
 [![Platform](https://img.shields.io/badge/Platform-Android%20(ARM64%20IL2CPP)-green.svg)](https://www.android.com/)
-[![Version](https://img.shields.io/badge/Release-v1.36--b4%20(Build%20%234)-orange.svg)](https://github.com/sadmsd707/Game)
+[![Version](https://img.shields.io/badge/Release-v1.36--b5%20(Build%20%235)-orange.svg)](https://github.com/sadmsd707/Game)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE.md)
 
 A production-ready open-world mobile simulation game built with **Unity 6 (6000.6.9f1)** and the **Universal Render Pipeline (URP)**. Explore an expansive world featuring a multi-lane highway, construction zones, agricultural crop fields, and quarry dig sites across six drivable, physically-calibrated heavy vehicles.
@@ -14,9 +14,9 @@ A production-ready open-world mobile simulation game built with **Unity 6 (6000.
 
 - **Artifact Name:** `HeavyVehiclesWorld_Production.apk`
 - **Location:** `Builds/Android/HeavyVehiclesWorld_Production.apk`
-- **Build Number:** Build #4 (`bundleVersionCode: 4`, `v1.36-b4`)
-- **File Size:** 38.03 MB (39,880,068 bytes)
-- **SHA-256 Checksum:** `999A64811FC08E13A24D5181BBB169E12B86F719DC2D98AA19531304820FBA69`
+- **Build Number:** Build #5 (`bundleVersionCode: 5`, `v1.36-b5`)
+- **File Size:** 38.04 MB (39,885,212 bytes)
+- **SHA-256 Checksum:** `4A6E9BE2BBE622B69500E6D445CC6A8C4F4C3E84AA081F11D8598EBA0433F879`
 - **Architecture:** ARM64 (`v8a`, IL2CPP)
 - **Minimum OS:** Android 8.0 Oreo (API Level 26)
 - **Target OS:** Android 14 (API Level 34)
@@ -204,6 +204,19 @@ Every modification in project development is tracked below, corresponding direct
   - Executed automated screenshot verification suite (`HVW_RenderingValidation.cs`) capturing 6 camera views: achieved **0 magenta pixels (0.00%) and 0 blank-white patch pixels (0.00%)**.
   - Verified readable top-bar button text across 1280x576, 1920x1080, and 2400x1080 resolutions.
   - Built Android Production APK Build #4 (`bundleVersionCode: 4`, 39.88 MB, SHA-256: `999A64811FC08E13A24D5181BBB169E12B86F719DC2D98AA19531304820FBA69`).
+
+### Version 1.41 | Change #42 (Phase 3 - High-Quality Graphics)
+- **Four-Tier URP Architecture, ASTC Textures & SSAO:**
+  - Implemented 4 dedicated Universal Render Pipeline assets: `URP_Quality_Low` (MSAA off, 40m hard shadows), `URP_Quality_Medium` (2x MSAA, 60m soft shadows, 2 cascades), `URP_Quality_High` (4x MSAA, 100m soft shadows, 3 cascades, anisotropic filtering forced on), and `URP_Quality_Ultra` (4x MSAA, 120m soft shadows, 4 cascades, 1.15x render scale, Screen Space Ambient Occlusion SSAO).
+  - Placed mirror copies in `Assets/Resources/Settings/` for dynamic runtime hot-swapping on Android release APKs.
+  - Implemented hardware RAM/GPU auto-detection at launch (<3.5GB $\rightarrow$ Low, <5.5GB $\rightarrow$ Medium, <7.5GB $\rightarrow$ High, $\ge$7.5GB $\rightarrow$ Ultra) with manual override persistence via `GFX_Quality_UserOverride`.
+  - Updated in-game Settings modal: 4 quality buttons (`LOW`, `MEDIUM`, `HIGH`, `ULTRA`) linked to `GraphicsSettingsManager.ApplyQuality`.
+  - Added world `ReflectionProbe_World` (400m x 100m x 400m) and `LightProbeGroup_Vehicles` (7x7x3 grid covering -120m to +120m) for dynamic vehicle ambient illumination and static GI.
+  - Built `HVW_TextureOptimizer.cs`: automated Android platform texture import overrides for `ASTC_4x4` (vehicles), `ASTC_6x6` (terrain/props), mipmaps enabled, linear normal maps, and `TextureImporterType.NormalMap`.
+  - Upgraded `HVW_DiagnosticsOverlay.cs`: real-time telemetry for URP MSAA, HDR, shadow distance, cascades, anisotropic filtering, and asset model presence warning banner.
+  - Updated `ASSET_INTEGRATION_GUIDE.md` with exact filenames, ASTC compression table, tier performance specifications, and fallback architecture.
+  - Executed automated screenshot verification across all 4 tiers (`HVW_RenderingValidation.RunPhase3TierValidation`): verified **0 magenta pixels (0.00%) and 0 white patches (0.00%)** across Low, Medium, High, and Ultra.
+  - Compiled and packaged Android Production APK Build #5 (`HeavyVehiclesWorld_Production.apk`, 38.04 MB, `bundleVersionCode: 5`, SHA-256: `4A6E9BE2BBE622B69500E6D445CC6A8C4F4C3E84AA081F11D8598EBA0433F879`).
 
 ---
 

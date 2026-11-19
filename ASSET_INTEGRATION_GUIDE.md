@@ -222,12 +222,47 @@ The game terrain uses Unity's multi-layer **TerrainLayer** system with 4 distinc
 
 ---
 
-## 6. Console Warning System
+## 6. ASTC Mobile Texture Import Standards
 
-If any asset is missing, the engine logs clear, actionable instructions in the console:
-```
-[VehicleModelSlot] ⚠️ No 3D model found in 'Car_SUV/Model' for Car!
-To import: Download the 3D model (.fbx/.obj) and drop it into 'Assets/Models/Vehicles/Car/', then drag it into the 'Model' slot.
-See ASSET_INTEGRATION_GUIDE.md for exact models, pivot rules, and rigging instructions.
-```
-No fake or primitive placeholder art will be generated.
+To achieve optimal performance and zero visual compression artifacts on Android devices, all textures are imported using ASTC (Adaptive Scalable Texture Compression):
+
+| Texture Role | Target Format | Mipmaps | sRGB Color | Normal Map Flag | Destination Directory |
+|---|---|---|---|---|---|
+| **Vehicle Albedo** | `ASTC_4x4` | Enabled | `True` | `False` | `Assets/Textures/Vehicles/` |
+| **Vehicle Normal Map** | `ASTC_4x4` | Enabled | `False` | `True` | `Assets/Textures/Vehicles/` |
+| **Vehicle Metallic/Smooth**| `ASTC_4x4` | Enabled | `False` | `False` | `Assets/Textures/Vehicles/` |
+| **Terrain Albedo Maps** | `ASTC_6x6` | Enabled | `True` | `False` | `Assets/Terrain/` or `Assets/Textures/Terrain/` |
+| **Terrain Normal Maps** | `ASTC_6x6` | Enabled | `False` | `True` | `Assets/Terrain/` or `Assets/Textures/Terrain/` |
+| **Props & Foliage** | `ASTC_6x6` | Enabled | `True` | `False` | `Assets/Textures/Environment/` |
+| **Skybox Panorama** | `ASTC_6x6` or `RGB_24` | Disabled | `True` | `False` | `Assets/Textures/Skybox/` |
+
+> Automated by `Assets/Editor/HVW_TextureOptimizer.cs` (`HeavyVehiclesWorld/Optimize All Textures (ASTC Android)`).
+
+---
+
+## 7. Graphics Quality Tiers & Performance Targets
+
+HeavyVehiclesWorld provides 4 distinct quality tiers, each driven by its own dedicated Universal Render Pipeline asset:
+
+| Tier | Target Frame Rate | Resolution / Render Scale | MSAA | Shadows | Shadow Distance | Post-Processing & Special Features |
+|---|---|---|---|---|---|---|
+| **LOW** | 30 FPS (Battery Saver) | Native, Render Scale `1.0` | Disabled (`1x`) | Hard Only | `40 m` | ACES tonemapping, subtle vignette |
+| **MEDIUM** | 30 - 45 FPS (Balanced) | Native, Render Scale `1.0` | `2x` MSAA | Soft Shadows (2 cascades) | `60 m` | ACES, subtle bloom (`0.15`), vignette, color grading |
+| **HIGH** | 60 FPS (PBR Crisp) | Native, Render Scale `1.0` | `4x` MSAA | Soft Shadows (3 cascades) | `100 m` | ACES, subtle bloom (`0.20`), vignette, color grading, anisotropic filtering forced ON |
+| **ULTRA** | 60 FPS (Flagship) | Native, Render Scale `1.15` | `4x` MSAA | Soft Shadows (4 cascades) | `120 m` | ACES, bloom (`0.25`), vignette, color grading, **SSAO (Screen Space Ambient Occlusion)** |
+
+- **Hardware Auto-Detection**: At first boot, device RAM (`SystemInfo.systemMemorySize`) and GPU determine the optimal default tier (<3.5GB $\rightarrow$ Low, <5.5GB $\rightarrow$ Medium, <7.5GB $\rightarrow$ High, $\ge$7.5GB $\rightarrow$ Ultra).
+- **In-Game Override**: Tap `⚙ SETTINGS` in the top bar to switch between Low, Medium, High, and Ultra at any time.
+
+---
+
+## 8. Fallback Architecture & Real-Time Warning System
+
+When a 3D model asset has not yet been placed in `Assets/Models/Vehicles/<Vehicle>/`:
+1. The engine automatically displays a **clean stylized low-poly fallback mesh** with physically calibrated PBR materials (never unshaded pink, bright red, or blank white).
+2. The HUD Diagnostics Overlay (`🔧 DBG` button) prominently displays an on-screen warning:
+   ```
+   ⚠️ ASSET STATUS: Using Fallback Low-Poly geometry for [Vehicle].
+      (Place 3D FBX into Assets/Models/Vehicles/[Vehicle]/ - see ASSET_INTEGRATION_GUIDE.md)
+   ```
+3. Once you place the corresponding `.fbx` model into the vehicle's folder, the fallback geometry automatically hides and the real 3D model takes over without requiring code changes.

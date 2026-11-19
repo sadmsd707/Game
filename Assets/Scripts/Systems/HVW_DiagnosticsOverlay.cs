@@ -184,12 +184,31 @@ namespace HeavyVehiclesWorld.Systems
             int qIdx = QualitySettings.GetQualityLevel();
             string qName = (qIdx >= 0 && qIdx < QualitySettings.names.Length) ? QualitySettings.names[qIdx] : $"Tier {qIdx}";
             sb.AppendLine($"Pipeline Asset:  {pipelineName} | Quality: {qName} (level {qIdx}) | Render Scale: {renderScale:F2}");
+            sb.AppendLine($"MSAA:            URP={((urpAsset != null) ? urpAsset.msaaSampleCount : 1)}x | HDR: {((urpAsset != null && urpAsset.supportsHDR) ? "ON" : "OFF")} | Aniso: {QualitySettings.anisotropicFiltering}");
+            sb.AppendLine($"Shadows:         Distance={QualitySettings.shadowDistance:F0}m | Cascades={((urpAsset != null) ? urpAsset.shadowCascadeCount : 1)} | Type={QualitySettings.shadows}");
 
             // 2. Active Vehicle & Rigidbody
             sb.AppendLine("\n=== [2. ACTIVE VEHICLE & RIGIDBODY] ===");
             if (activeVeh != null)
             {
                 sb.AppendLine($"Vehicle:         {activeVeh.VehicleName} [{activeVeh.vehicleType}] (Obj: {activeVeh.gameObject.name})");
+
+                // Asset Model Presence Validation
+                bool hasReal3DModel = false;
+                var modelSlot = activeVeh.GetComponent<VehicleModelSlot>();
+                if (modelSlot != null && modelSlot.modelSlot != null && modelSlot.modelSlot.childCount > 0)
+                    hasReal3DModel = true;
+
+                if (!hasReal3DModel)
+                {
+                    sb.AppendLine($"⚠️ ASSET STATUS: Using Fallback Low-Poly geometry for {activeVeh.vehicleType}.");
+                    sb.AppendLine($"   (Place 3D FBX into Assets/Models/Vehicles/{activeVeh.vehicleType}/ - see ASSET_INTEGRATION_GUIDE.md)");
+                }
+                else
+                {
+                    sb.AppendLine($" 3D ASSET: Real imported model active for {activeVeh.vehicleType}.");
+                }
+
                 var rb = activeVeh.rb;
                 if (rb != null)
                 {

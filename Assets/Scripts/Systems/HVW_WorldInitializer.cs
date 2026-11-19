@@ -1102,9 +1102,10 @@ namespace HeavyVehiclesWorld.Systems
             string qName = (curQIdx >= 0 && curQIdx < QualitySettings.names.Length) ? QualitySettings.names[curQIdx] : $"Tier {curQIdx}";
             _gfxQualityStatusText = CreateText(_settingsModalPanel, "Txt_QualityStatus", $"CURRENT: {qName}", 14, TextAnchor.MiddleRight, new Vector2(140f, 95f), new Vector2(220f, 28f), new Color(1f, 0.85f, 0.3f));
 
-            CreateClickButton(_settingsModalPanel, "Btn_Quality_Low", "LOW (Fast)", new Vector2(0.5f, 0.5f), new Vector2(-160f, 50f), new Vector2(140f, 38f), new Color(0.20f, 0.45f, 0.25f, 0.90f), () => SetGraphicsQuality(0));
-            CreateClickButton(_settingsModalPanel, "Btn_Quality_Medium", "MEDIUM", new Vector2(0.5f, 0.5f), new Vector2(0f, 50f), new Vector2(140f, 38f), new Color(0.20f, 0.40f, 0.65f, 0.90f), () => SetGraphicsQuality(1));
-            CreateClickButton(_settingsModalPanel, "Btn_Quality_High", "HIGH (PBR)", new Vector2(0.5f, 0.5f), new Vector2(160f, 50f), new Vector2(140f, 38f), new Color(0.55f, 0.25f, 0.55f, 0.90f), () => SetGraphicsQuality(2));
+            CreateClickButton(_settingsModalPanel, "Btn_Quality_Low", "LOW", new Vector2(0.5f, 0.5f), new Vector2(-180f, 50f), new Vector2(110f, 38f), new Color(0.20f, 0.45f, 0.25f, 0.90f), () => SetGraphicsQuality(0));
+            CreateClickButton(_settingsModalPanel, "Btn_Quality_Medium", "MEDIUM", new Vector2(0.5f, 0.5f), new Vector2(-60f, 50f), new Vector2(110f, 38f), new Color(0.20f, 0.40f, 0.65f, 0.90f), () => SetGraphicsQuality(1));
+            CreateClickButton(_settingsModalPanel, "Btn_Quality_High", "HIGH", new Vector2(0.5f, 0.5f), new Vector2(60f, 50f), new Vector2(110f, 38f), new Color(0.25f, 0.35f, 0.70f, 0.90f), () => SetGraphicsQuality(2));
+            CreateClickButton(_settingsModalPanel, "Btn_Quality_Ultra", "ULTRA", new Vector2(0.5f, 0.5f), new Vector2(180f, 50f), new Vector2(110f, 38f), new Color(0.55f, 0.25f, 0.55f, 0.90f), () => SetGraphicsQuality(3));
 
             // FPS Cap Section
             CreateText(_settingsModalPanel, "Lbl_FPSCap", "FRAME RATE CAP:", 16, TextAnchor.MiddleLeft, new Vector2(-120f, -10f), new Vector2(260f, 28f), new Color(0.4f, 0.85f, 1f));
@@ -1133,9 +1134,6 @@ namespace HeavyVehiclesWorld.Systems
 
         public void SetGraphicsQuality(int level)
         {
-            int targetQuality = Mathf.Clamp(level * 2, 0, QualitySettings.names.Length - 1);
-            QualitySettings.SetQualityLevel(targetQuality, true);
-
             var mgr = GraphicsSettingsManager.Instance;
             if (mgr != null)
             {
@@ -1143,28 +1141,23 @@ namespace HeavyVehiclesWorld.Systems
             }
             else
             {
+                int targetQuality = level switch
+                {
+                    0 => 1, // Low
+                    1 => 2, // Medium
+                    2 => 3, // High
+                    3 => 5, // Ultra
+                    _ => 3
+                };
+                QualitySettings.SetQualityLevel(targetQuality, true);
                 PlayerPrefs.SetInt("Settings_GraphicsQuality", level);
-                PlayerPrefs.Save();
             }
 
-            if (level == 0)
-            {
-                QualitySettings.shadows = ShadowQuality.Disable;
-                QualitySettings.shadowDistance = 25f;
-            }
-            else if (level == 1)
-            {
-                QualitySettings.shadows = ShadowQuality.HardOnly;
-                QualitySettings.shadowDistance = 75f;
-            }
-            else
-            {
-                QualitySettings.shadows = ShadowQuality.All;
-                QualitySettings.shadowDistance = 150f;
-            }
+            PlayerPrefs.SetInt("GFX_Quality_UserOverride", 1);
+            PlayerPrefs.Save();
 
             UpdateSettingsLabels();
-            Debug.Log($"[Settings] Graphics Quality changed to: {QualitySettings.names[QualitySettings.GetQualityLevel()]} (tier {level})");
+            Debug.Log($"[Settings] Graphics Quality changed to tier {level} (QualityLevel: {QualitySettings.names[QualitySettings.GetQualityLevel()]})");
         }
 
         public void SetFPSCap(int fps)
