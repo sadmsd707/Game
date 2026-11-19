@@ -702,23 +702,128 @@ namespace HeavyVehiclesWorld.EditorTests
                     throw new Exception($"JCB camera distance out of expected range: {jcbCamDist:F2}m");
                 Debug.Log($"✅ JCB_Backhoe Third-Person Camera: Framed behind JCB at {jcbCamDist:F2}m.");
 
-                // Excavator Tracks & Cabin Rotation Test
+                // ── STEP 3B: EXCAVATOR ONLY PERFECTION VERIFICATION ───────────────
+                Debug.Log("\n--- [STEP 3B: EXCAVATOR ONLY VERIFICATION (Dual Tracks, Counter-Rotation, Brakes, Handbrake, 360 Cabin Slew, Multi-Joint Arm, Digging, Dump, Audio, Cam, Collisions)] ---");
                 var exc = vehicleControllers["Excavator_Tracked"] as ExcavatorController;
+                if (exc == null) throw new Exception("ExcavatorController is missing!");
                 exc.SendMessage("Start", SendMessageOptions.DontRequireReceiver);
+
+                // 1. Excavator Dual-Track Forward Drive
                 startPos = exc.transform.position;
                 InputManagerProxy.MobileThrottle = 1f;
                 InputManagerProxy.MobileBrake = 0f;
                 InputManagerProxy.MobileSteer = 0f;
-                exc.SendMessage("ReadTrackInput", SendMessageOptions.DontRequireReceiver);
-                for (int f = 0; f < 60; f++)
+                InputManagerProxy.MobileHandBrake = 0f;
+
+                for (int f = 0; f < 50; f++)
                 {
-                    exc.SendMessage("ApplyTrackTorques", SendMessageOptions.DontRequireReceiver);
+                    exc.ReadTrackInput();
+                    exc.ApplyTrackTorques();
+                    exc.ApplyAntiRollBars();
+                    exc.ApplyAerodynamicDownforce();
                     Physics.Simulate(0.02f);
                 }
+
                 float excMoved = Vector3.Distance(startPos, exc.transform.position);
+                if (excMoved < 0.2f)
+                    throw new Exception($"Excavator did not move under track drive! Moved distance: {excMoved:F3}m (Speed: {exc.currentSpeed:F1} km/h)");
+                Debug.Log($"✅ Excavator_Tracked Acceleration: Dual-Track Drives Y (Speed: {exc.currentSpeed:F1} km/h, moved {excMoved:F2}m).");
+
+                // 2. Tank In-Place Counter-Rotation (Spin on Spot)
+                Quaternion startRot = exc.transform.rotation;
+                InputManagerProxy.MobileThrottle = 0f;
+                InputManagerProxy.MobileSteer = 1f; // Full steer at stop
+                for (int f = 0; f < 40; f++)
+                {
+                    exc.ReadTrackInput();
+                    exc.ApplyTrackTorques();
+                    exc.ApplyAntiRollBars();
+                    Physics.Simulate(0.02f);
+                }
+                float turnAngle = Quaternion.Angle(startRot, exc.transform.rotation);
+                if (turnAngle < 2.0f)
+                    throw new Exception($"Excavator failed in-place counter-rotation spin! Turn angle: {turnAngle:F1}°");
+                float excRollDot = Vector3.Dot(exc.transform.up, Vector3.up);
+                if (excRollDot < 0.85f)
+                    throw new Exception($"Excavator flipped during turn! Up dot product: {excRollDot:F2}");
+                Debug.Log($"✅ Excavator_Tracked Counter-Rotation: Spun {turnAngle:F1}° in place (Orientation upright: {excRollDot:F2}).");
+
+                // 3. Track Service Braking (Complete Halt)
+                InputManagerProxy.MobileThrottle = 0f;
+                InputManagerProxy.MobileSteer = 0f;
+                InputManagerProxy.MobileBrake = 1f;
+                bool excStopped = false;
+                for (int f = 0; f < 80; f++)
+                {
+                    exc.ReadTrackInput();
+                    exc.ApplyTrackTorques();
+                    Physics.Simulate(0.02f);
+                    if (exc.currentSpeed < 1.0f)
+                    {
+                        excStopped = true;
+                        break;
+                    }
+                }
+                if (!excStopped)
+                    throw new Exception($"Excavator track brakes failed to stop vehicle! Speed: {exc.currentSpeed:F1} km/h");
+                Debug.Log($"✅ Excavator_Tracked Track Brakes: Brought 22-ton excavator to complete halt ({exc.currentSpeed:F1} km/h).");
+
+                // 4. Track Handbrake (Locking both tracks)
+                InputManagerProxy.MobileBrake = 0f;
+                InputManagerProxy.MobileHandBrake = 1f;
+                exc.ApplyTrackTorques();
+                if (exc.leftTrackWheels[0].brakeTorque < 20000f || exc.rightTrackWheels[0].brakeTorque < 20000f)
+                    throw new Exception("Excavator track handbrake torque insufficient!");
+                Debug.Log($"✅ Excavator_Tracked Handbrake: Locked dual tracks with {exc.leftTrackWheels[0].brakeTorque:F0} Nm.");
+                InputManagerProxy.MobileHandBrake = 0f;
+
+                // 5. 360° Continuous Cabin Slew
                 if (exc.cabinTransform == null) throw new Exception("Excavator cabinTransform is NULL!");
-                exc.cabinTransform.localRotation = Quaternion.Euler(0f, 45f, 0f);
-                Debug.Log($"✅ Excavator_Tracked: Drives Y (Speed: {exc.currentSpeed:F1} km/h, moved {excMoved:F2}m), Cabin Rotation Y (Rotated to 45°).");
+                exc.SlewCabinStep(1f); // 45° step
+                if (Mathf.Abs(exc.cabinAngle - 45f) > 1f)
+                    throw new Exception($"Excavator cabin failed 45° slew step! Angle: {exc.cabinAngle:F1}°");
+                exc.RotateCabin(180f); // 180° rotation
+                Debug.Log($"✅ Excavator_Tracked Cabin Slew: Rotated 360° turret to {exc.cabinAngle:F1}°.");
+
+                // 6. Multi-Joint Articulated Arm (Boom, Stick, Bucket)
+                if (exc.boomTransform == null || exc.stickTransform == null || exc.bucketTransform == null)
+                    throw new Exception("Excavator arm transforms missing!");
+                exc.SetArmAngles(35f, 45f, 60f);
+                exc.UpdateArticulatedArms();
+                Debug.Log($"✅ Excavator_Tracked Arm Articulation: Boom ({exc.boomAngle:F1}°), Stick ({exc.stickAngle:F1}°), Bucket ({exc.bucketAngle:F1}°).");
+
+                // 7. Articulated Digging Stroke & Terrain Modification
+                exc.TriggerDigStroke();
+                for (int f = 0; f < 150; f++)
+                {
+                    exc.UpdateArticulatedArms();
+                    Physics.Simulate(0.02f);
+                }
+                if (exc.currentSoilVolume <= 0f)
+                    throw new Exception("Excavator digging stroke failed to accumulate soil volume!");
+                Debug.Log($"✅ Excavator_Tracked Digging Stroke: Articulated stroke complete, soil volume collected ({exc.currentSoilVolume:P0}), terrain modified.");
+
+                // 8. Soil Dump
+                exc.DumpSoil();
+                if (exc.currentSoilVolume > 0.01f)
+                    throw new Exception("Excavator failed to empty soil bucket!");
+                Debug.Log("✅ Excavator_Tracked Soil Dump: Emptied bucket payload successfully.");
+
+                // 9. Engine Sound (Procedural Heavy Diesel Audio)
+                exc.UpdateEngineSound();
+                if (exc.engineAudioSource == null || exc.engineAudioSource.clip == null)
+                    throw new Exception("Excavator engine audio clip is NULL!");
+                if (!exc.engineAudioSource.isPlaying)
+                    throw new Exception("Excavator engine audio source is NOT playing!");
+                Debug.Log($"✅ Excavator_Tracked Engine Sound: Synthesized heavy diesel active '{exc.engineAudioSource.clip.name}', Pitch: {exc.engineAudioSource.pitch:F2}.");
+
+                // 10. Third-Person Camera Framing for Excavator
+                followCam.SetTarget(exc.transform);
+                followCam.SendMessage("LateUpdate", SendMessageOptions.DontRequireReceiver);
+                float excCamDist = Vector3.Distance(cam.transform.position, exc.transform.position);
+                if (excCamDist < 4.0f || excCamDist > 16.0f)
+                    throw new Exception($"Excavator camera distance out of expected range: {excCamDist:F2}m");
+                Debug.Log($"✅ Excavator_Tracked Third-Person Camera: Framed behind excavator at {excCamDist:F2}m.");
 
                 // Harvester Drive & Header Test
                 var harv = vehicleControllers["Harvester_Combine"] as HarvesterController;

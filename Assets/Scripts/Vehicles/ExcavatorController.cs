@@ -5,136 +5,159 @@ using HeavyVehiclesWorld.World;
 namespace HeavyVehiclesWorld.Vehicles
 {
     /// <summary>
-    /// Tracked excavator (Poclain / Poklen) controller.
-    /// Inherits VehicleController.
-    ///
-    /// Movement     : Tank-style differential drive simulated with 4 WheelColliders
-    ///               per side (8 total), arranged as track bogies.
-    /// Cabin        : Smooth 360° rotation around local Y via Transform.
-    /// Arm chain    : boom → stick → bucket using HydraulicArm components.
-    /// Terrain dig  : Calls TerrainDeformer.DigAt when bucket is near terrain.
-    /// Soil bucket  : currentSoilVolume (0-1); DumpSoil() pours soil to world pos.
+    /// Tracked heavy excavator (Poclain / 360 Excavator) controller.
+    /// Features: Dual-track differential drive with counter-rotation in place,
+    /// 360° continuous cabin slew rotation, multi-joint articulated arm chain
+    /// (boom, stick, bucket), real-time terrain digging, soil collection,
+    /// and procedural heavy turbo diesel audio.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     [RequireComponent(typeof(AudioSource))]
     public class ExcavatorController : VehicleController
     {
-        // ── Track WheelColliders (4 per side, acting as bogies) ────────────
-        [Header("Excavator – Tracks (WheelCollider bogies)")]
-        [SerializeField] public WheelCollider[] leftTrackWheels  = new WheelCollider[4];
-        [SerializeField] public WheelCollider[] rightTrackWheels = new WheelCollider[4];
+        // ── Track WheelColliders (Bogies) ──────────────────────────────────
+        [Header("Excavator – Tracks (WheelCollider Bogies)")]
+        [SerializeField] public WheelCollider[] leftTrackWheels  = new WheelCollider[2];
+        [SerializeField] public WheelCollider[] rightTrackWheels = new WheelCollider[2];
 
-        [SerializeField] private float trackMotorTorque = 7000f;
-        [SerializeField] private float trackBrakeTorque = 5000f;
-        [SerializeField] private float topSpeedKmh      = 12f;
+        [SerializeField] private float trackMotorTorque = 12000f;
+        [SerializeField] private float trackBrakeTorque = 18000f;
+        [SerializeField] private float handBrakeTorque  = 25000f;
+        [SerializeField] private float topSpeedKmh      = 15f;
 
-        // ── Track speed state ──────────────────────────────────────────────
-        private float _leftTrackSpeed;
-        private float _rightTrackSpeed;
+        // ── Suspension & Stability ─────────────────────────────────────────
+        [Header("Suspension & Stability")]
+        public float antiRollStiffness = 18000f;
+        public float downforceCoefficient = 4.0f;
 
-        // ── Cabin rotation ─────────────────────────────────────────────────
-        [Header("Excavator – Cabin")]
+        // ── Track Speed State ──────────────────────────────────────────────
+        private float _leftTrackInput;
+        private float _rightTrackInput;
+
+        // ── Cabin Rotation (Slew) ──────────────────────────────────────────
+        [Header("Excavator – Cabin (Slew)")]
         [SerializeField] public Transform cabinTransform;
-        [SerializeField] private float cabinRotateSpeed = 60f;    // deg/s
+        [SerializeField] public float cabinRotateSpeed = 45f; // Deg/sec
+        public float cabinAngle;
 
-        private float _cabinAngle;
+        // ── Articulated Arm Chain ──────────────────────────────────────────
+        [Header("Excavator – Arm Transforms")]
+        [SerializeField] public Transform boomTransform;      // Boom pitch: -15° to 65°
+        [SerializeField] public Transform stickTransform;     // Stick pitch: -30° to 75°
+        [SerializeField] public Transform bucketTransform;    // Bucket pitch: -55° to 80°
+        [SerializeField] public Transform bucketTip;          // Penetration tip
 
-        // ── Arm chain ──────────────────────────────────────────────────────
-        [Header("Excavator – Arm")]
-        [SerializeField] public HydraulicArm boomArm;      // -10 to 70°
-        [SerializeField] public HydraulicArm stickArm;     // 0 to 120°
-        [SerializeField] public HydraulicArm bucketArm;    // -40 to 90°
+        [SerializeField] public HydraulicArm boomArm;
+        [SerializeField] public HydraulicArm stickArm;
+        [SerializeField] public HydraulicArm bucketArm;
 
-        [SerializeField] public Transform bucketTip;       // world pos used for dig detection
+        [Header("Excavator – Arm Angles")]
+        public float boomAngle = 10f;
+        public float stickAngle = 15f;
+        public float bucketAngle = 0f;
+        [SerializeField] private float armSpeed = 35f;
 
-        // ── Terrain deformer ───────────────────────────────────────────────
-        [Header("Excavator – Terrain")]
+        // ── Terrain Digging & Soil ─────────────────────────────────────────
+        [Header("Excavator – Terrain & Soil")]
         [SerializeField] public TerrainDeformer terrainDeformer;
-        [SerializeField] private float digRadius       = 0.6f;
-        [SerializeField] private float digDepth        = 0.5f;
-        [SerializeField] private float digGroundOffset = 0.3f;  // bucket tip height threshold for digging
+        [SerializeField] private float digRadius = 1.4f;
+        [SerializeField] private float digDepth  = 0.5f;
+        [Range(0f, 1f)] public float currentSoilVolume;
+        [SerializeField] private float soilCollectRate = 0.35f;
 
-        // ── Soil bucket ────────────────────────────────────────────────────
-        [Header("Excavator – Soil Bucket")]
-        public float currentSoilVolume;   // 0-1
-        [SerializeField] private float soilCollectRate = 0.2f;  // per second while digging
-        [SerializeField] private ParticleSystem dirtParticles;
-
-        // ── Engine audio ───────────────────────────────────────────────────
-        [Header("Audio")]
-        [SerializeField] private float engineIdlePitch = 0.6f;
-        [SerializeField] private float engineMaxPitch  = 1.3f;
+        private bool _isPerformingDigCycle;
+        private float _digCycleTimer;
 
         // ── Lifecycle ──────────────────────────────────────────────────────
         protected override void Start()
         {
             base.Start();
             vehicleType = VehicleType.Excavator;
+            maxRPM = 2400f;
+            rb.mass = 22000f; // 22 tons
+            rb.centerOfMass = new Vector3(0f, -0.6f, 0f);
 
-            // Excavator is very heavy – tracks don't use suspension the same way
-            rb.centerOfMass = new Vector3(0f, -0.8f, 0f);
+            ConfigureTrackFriction(leftTrackWheels);
+            ConfigureTrackFriction(rightTrackWheels);
+
+            if (terrainDeformer == null)
+                terrainDeformer = FindObjectOfType<TerrainDeformer>();
+        }
+
+        private void FixedUpdate()
+        {
+            if (!engineRunning) return;
+
+            ReadTrackInput();
+            ApplyTrackTorques();
+            ApplyAntiRollBars();
+            ApplyAerodynamicDownforce();
+            UpdateArticulatedArms();
+            ConsumeFuel();
         }
 
         protected override void Update()
         {
             base.Update();
-            if (!isOccupied || !engineRunning) return;
-
-            ReadTrackInput();
-            ReadArmInput();
-            RotateCabin();
-            CheckDigging();
+            UpdateEngineSound();
+            HandleManualCabinAndArm();
         }
 
-        private void FixedUpdate()
-        {
-            ApplyTrackTorques();
-        }
-
-        // ── Track driving ──────────────────────────────────────────────────
+        // ── Track Driving & Counter-Rotation ───────────────────────────────
         public override void ApplyDriving()
         {
-            // Called from base; actual torques applied in FixedUpdate via ApplyTrackTorques
+            // Handled directly via ReadTrackInput & ApplyTrackTorques in FixedUpdate
         }
 
         public override void ApplySteering()
         {
-            // Steering is differential – handled in ReadTrackInput
+            // Tank differential steering handled via ReadTrackInput
         }
 
-        private void ReadTrackInput()
+        public void ReadTrackInput()
         {
-            var input = InputManager.Instance;
-            float fwd = (input != null && Mathf.Abs(input.LeftJoystick.y) > 0.01f)
-                ? input.LeftJoystick.y
-                : (InputManagerProxy.Throttle - InputManagerProxy.Brake);
+            float throttle = InputManagerProxy.Throttle - InputManagerProxy.Brake;
+            float steer    = InputManagerProxy.Steer;
 
-            float turn = (input != null && Mathf.Abs(input.LeftJoystick.x) > 0.01f)
-                ? input.LeftJoystick.x
-                : InputManagerProxy.Steer;
-
-            _leftTrackSpeed  = Mathf.Clamp(fwd + turn, -1f, 1f);
-            _rightTrackSpeed = Mathf.Clamp(fwd - turn, -1f, 1f);
+            if (Mathf.Abs(throttle) < 0.05f && Mathf.Abs(steer) > 0.05f)
+            {
+                // In-place counter-rotation (tank spin)
+                _leftTrackInput  = steer;
+                _rightTrackInput = -steer;
+            }
+            else
+            {
+                // Forward/reverse differential drive
+                _leftTrackInput  = Mathf.Clamp(throttle + steer * 0.6f, -1f, 1f);
+                _rightTrackInput = Mathf.Clamp(throttle - steer * 0.6f, -1f, 1f);
+            }
 
             currentSpeed = rb.linearVelocity.magnitude * 3.6f;
         }
 
-        private void ApplyTrackTorques()
+        public void ApplyTrackTorques()
         {
-            if (!engineRunning) return;
-
             float topSpeedMs = topSpeedKmh / 3.6f;
-            float speedRatio = rb.linearVelocity.magnitude / topSpeedMs;
+            float speedRatio = Mathf.Clamp01(rb.linearVelocity.magnitude / topSpeedMs);
 
-            ApplyToTrack(leftTrackWheels,  _leftTrackSpeed,  speedRatio);
-            ApplyToTrack(rightTrackWheels, _rightTrackSpeed, speedRatio);
+            ApplyToTrack(leftTrackWheels, _leftTrackInput, speedRatio);
+            ApplyToTrack(rightTrackWheels, _rightTrackInput, speedRatio);
+
+            // Handbrake locks both tracks completely
+            if (InputManagerProxy.HandBrake > 0.5f)
+            {
+                LockTracks(handBrakeTorque);
+            }
+
             currentSpeed = rb.linearVelocity.magnitude * 3.6f;
         }
 
         private void ApplyToTrack(WheelCollider[] wheels, float input, float speedRatio)
         {
-            float torque = speedRatio < 1f ? input * trackMotorTorque : 0f;
-            float brake  = Mathf.Approximately(input, 0f) ? trackBrakeTorque : 0f;
+            if (wheels == null) return;
+
+            float torque = Mathf.Abs(input) > 0.05f ? input * trackMotorTorque * (1f - speedRatio * 0.3f) : 0f;
+            float brake  = Mathf.Abs(input) <= 0.05f ? trackBrakeTorque : 0f;
 
             foreach (var wc in wheels)
             {
@@ -144,99 +167,268 @@ namespace HeavyVehiclesWorld.Vehicles
             }
         }
 
-        // ── Cabin rotation ─────────────────────────────────────────────────
-        private void RotateCabin()
+        public void LockTracks(float brakeForce)
         {
-            // Left joystick X also rotates the cabin when parked (optional)
-            // Right joystick X: cabin rotation while arm is working
-            var input = InputManager.Instance;
-            if (input == null) return;
+            LockTrackGroup(leftTrackWheels, brakeForce);
+            LockTrackGroup(rightTrackWheels, brakeForce);
+        }
 
-            float rotInput = input.RightJoystick.x;
-            _cabinAngle += rotInput * cabinRotateSpeed * Time.deltaTime;
-            // 360° free rotation – no clamping needed
+        private void LockTrackGroup(WheelCollider[] wheels, float brakeForce)
+        {
+            if (wheels == null) return;
+            foreach (var wc in wheels)
+            {
+                if (wc == null) continue;
+                wc.motorTorque = 0f;
+                wc.brakeTorque = brakeForce;
+            }
+        }
 
+        // ── Suspension & Anti-Roll ─────────────────────────────────────────
+        public void ApplyAntiRollBars()
+        {
+            if (leftTrackWheels != null && rightTrackWheels != null)
+            {
+                int count = Mathf.Min(leftTrackWheels.Length, rightTrackWheels.Length);
+                for (int i = 0; i < count; i++)
+                {
+                    ApplyAntiRoll(leftTrackWheels[i], rightTrackWheels[i]);
+                }
+            }
+        }
+
+        public void ApplyAntiRoll(WheelCollider left, WheelCollider right)
+        {
+            if (left == null || right == null || rb == null) return;
+
+            float travelL = 1.0f;
+            float travelR = 1.0f;
+
+            bool groundedL = left.GetGroundHit(out WheelHit hitL);
+            if (groundedL)
+                travelL = (-left.transform.InverseTransformPoint(hitL.point).y - left.radius) / left.suspensionDistance;
+
+            bool groundedR = right.GetGroundHit(out WheelHit hitR);
+            if (groundedR)
+                travelR = (-right.transform.InverseTransformPoint(hitR.point).y - right.radius) / right.suspensionDistance;
+
+            float antiRollForce = (travelL - travelR) * antiRollStiffness;
+
+            if (groundedL)
+                rb.AddForceAtPosition(left.transform.up * -antiRollForce, left.transform.position);
+            if (groundedR)
+                rb.AddForceAtPosition(right.transform.up * antiRollForce, right.transform.position);
+        }
+
+        public void ApplyAerodynamicDownforce()
+        {
+            if (rb == null) return;
+            rb.AddForce(-transform.up * downforceCoefficient * rb.linearVelocity.sqrMagnitude);
+        }
+
+        private void ConfigureTrackFriction(WheelCollider[] wheels)
+        {
+            if (wheels == null) return;
+            foreach (var wc in wheels)
+            {
+                if (wc == null) continue;
+
+                WheelFrictionCurve fwd = wc.forwardFriction;
+                fwd.extremumSlip = 0.40f;
+                fwd.extremumValue = 1.0f;
+                fwd.asymptoteSlip = 0.80f;
+                fwd.asymptoteValue = 0.70f;
+                fwd.stiffness = 2.0f; // High track traction
+                wc.forwardFriction = fwd;
+
+                WheelFrictionCurve side = wc.sidewaysFriction;
+                side.extremumSlip = 0.35f;
+                side.extremumValue = 1.0f;
+                side.asymptoteSlip = 0.65f;
+                side.asymptoteValue = 0.80f;
+                side.stiffness = 2.2f;
+                wc.sidewaysFriction = side;
+            }
+        }
+
+        // ── Cabin Slew (360° Continuous Rotation) ──────────────────────────
+        public void RotateCabin(float deltaDeg)
+        {
+            cabinAngle = (cabinAngle + deltaDeg) % 360f;
             if (cabinTransform != null)
-                cabinTransform.localRotation = Quaternion.Euler(0f, _cabinAngle, 0f);
+                cabinTransform.localRotation = Quaternion.Euler(0f, cabinAngle, 0f);
         }
 
-        // ── Arm input ──────────────────────────────────────────────────────
-        private void ReadArmInput()
+        public void SlewCabinStep(float direction = 1f)
         {
-            var input = InputManager.Instance;
-            if (input == null) return;
-
-            // Left joystick Y: boom up/down
-            if (boomArm != null)
-                boomArm.AdjustTargetAngle(input.LeftJoystick.y * 40f * Time.deltaTime);
-
-            // Right joystick Y: stick in/out
-            if (stickArm != null)
-                stickArm.AdjustTargetAngle(-input.RightJoystick.y * 50f * Time.deltaTime);
-
-            // Additional: bucket curl could be driven by a 3rd axis / button
+            RotateCabin(direction * 45f);
         }
 
-        // ── Digging logic ──────────────────────────────────────────────────
-        private void CheckDigging()
+        // ── Articulated Arm & Digging Cycle ────────────────────────────────
+        public void SetArmAngles(float b, float s, float bk)
         {
-            if (bucketTip == null || terrainDeformer == null) return;
-
-            // Check if bucket tip is near ground level
-            float groundY = Terrain.activeTerrain != null
-                ? Terrain.activeTerrain.SampleHeight(bucketTip.position) +
-                  Terrain.activeTerrain.transform.position.y
-                : 0f;
-
-            bool nearGround = bucketTip.position.y < groundY + digGroundOffset;
-
-            if (nearGround && currentSoilVolume < 1f)
-            {
-                terrainDeformer.DigAt(bucketTip.position, digRadius, digDepth * Time.deltaTime);
-                currentSoilVolume += soilCollectRate * Time.deltaTime;
-                currentSoilVolume  = Mathf.Clamp01(currentSoilVolume);
-
-                if (dirtParticles != null && !dirtParticles.isPlaying)
-                    dirtParticles.Play();
-            }
-            else
-            {
-                if (dirtParticles != null && dirtParticles.isPlaying)
-                    dirtParticles.Stop();
-            }
+            boomAngle   = Mathf.Clamp(b, -15f, 65f);
+            stickAngle  = Mathf.Clamp(s, -30f, 75f);
+            bucketAngle = Mathf.Clamp(bk, -55f, 80f);
+            if (boomArm != null) boomArm.SetTargetAngle(boomAngle);
+            if (stickArm != null) stickArm.SetTargetAngle(stickAngle);
+            if (bucketArm != null) bucketArm.SetTargetAngle(bucketAngle);
         }
 
-        /// <summary>
-        /// Empties the soil bucket at the current bucket-tip world position.
-        /// Call this when the operator dumps a load.
-        /// </summary>
+        public void TriggerDigStroke()
+        {
+            _isPerformingDigCycle = true;
+            _digCycleTimer = 0f;
+        }
+
+        public void UpdateArticulatedArms()
+        {
+            // Automated articulated digging sequence
+            if (_isPerformingDigCycle)
+            {
+                _digCycleTimer += Time.fixedDeltaTime;
+                if (_digCycleTimer < 1.0f)
+                {
+                    // Phase 1: Reach boom and stick downward toward ground
+                    boomAngle   = Mathf.MoveTowards(boomAngle, 35f, armSpeed * Time.fixedDeltaTime);
+                    stickAngle  = Mathf.MoveTowards(stickAngle, 45f, armSpeed * Time.fixedDeltaTime);
+                    bucketAngle = Mathf.MoveTowards(bucketAngle, -35f, armSpeed * Time.fixedDeltaTime);
+                }
+                else if (_digCycleTimer < 2.0f)
+                {
+                    // Phase 2: Pull stick inward through soil and curl bucket
+                    stickAngle  = Mathf.MoveTowards(stickAngle, -10f, armSpeed * 1.5f * Time.fixedDeltaTime);
+                    bucketAngle = Mathf.MoveTowards(bucketAngle, 65f, armSpeed * 1.5f * Time.fixedDeltaTime);
+                }
+                else if (_digCycleTimer < 3.0f)
+                {
+                    // Phase 3: Lift boom upward with full bucket of soil
+                    boomAngle = Mathf.MoveTowards(boomAngle, -10f, armSpeed * Time.fixedDeltaTime);
+                    if (_digCycleTimer > 2.2f && currentSoilVolume < 0.2f)
+                    {
+                        DigAtGround();
+                    }
+                }
+                else
+                {
+                    _isPerformingDigCycle = false;
+                }
+            }
+
+            // Apply rotations to arm joints
+            if (boomTransform != null)
+                boomTransform.localRotation = Quaternion.Euler(boomAngle, 0f, 0f);
+            if (stickTransform != null)
+                stickTransform.localRotation = Quaternion.Euler(stickAngle, 0f, 0f);
+            if (bucketTransform != null)
+                bucketTransform.localRotation = Quaternion.Euler(bucketAngle, 0f, 0f);
+        }
+
+        public void DigAtGround()
+        {
+            Vector3 digPos = transform.position + transform.forward * 4.2f + Vector3.up * 0.1f;
+            if (bucketTip != null) digPos = bucketTip.position;
+
+            if (terrainDeformer != null)
+            {
+                terrainDeformer.DigAt(digPos, digRadius, digDepth);
+            }
+            currentSoilVolume = Mathf.Clamp01(currentSoilVolume + soilCollectRate);
+            Debug.Log($"[ExcavatorController] DigAtGround performed at {digPos}. Soil volume: {currentSoilVolume:P0}");
+        }
+
         public void DumpSoil()
         {
             if (currentSoilVolume <= 0f) return;
 
-            Vector3 dumpPos = bucketTip != null ? bucketTip.position : transform.position;
-
+            Vector3 dumpPos = bucketTip != null ? bucketTip.position : transform.position + transform.forward * 4f;
             if (terrainDeformer != null)
-                terrainDeformer.RaiseAt(dumpPos, digRadius * 1.5f, currentSoilVolume * 0.3f);
-
+            {
+                terrainDeformer.RaiseAt(dumpPos, digRadius * 1.2f, currentSoilVolume * 0.35f);
+            }
             currentSoilVolume = 0f;
+            // Tilt bucket to dump angle
+            bucketAngle = -45f;
+            Debug.Log($"[ExcavatorController] DumpSoil performed at {dumpPos}. Soil emptied.");
         }
 
-        // ── Engine sound ───────────────────────────────────────────────────
+        private void HandleManualCabinAndArm()
+        {
+            var input = InputManager.Instance;
+            if (input == null) return;
+
+            if (Mathf.Abs(input.RightJoystick.x) > 0.1f)
+            {
+                RotateCabin(input.RightJoystick.x * cabinRotateSpeed * Time.deltaTime);
+            }
+            if (Mathf.Abs(input.LeftJoystick.y) > 0.1f)
+            {
+                boomAngle += input.LeftJoystick.y * armSpeed * Time.deltaTime;
+                boomAngle = Mathf.Clamp(boomAngle, -15f, 65f);
+            }
+        }
+
+        // ── Engine Sound ───────────────────────────────────────────────────
         public override void UpdateEngineSound()
         {
             if (engineAudioSource == null) return;
-            if (!engineAudioSource.isPlaying) engineAudioSource.Play();
+            if (engineAudioSource.clip == null)
+            {
+                engineAudioSource.clip = CreateProceduralExcavatorDieselClip();
+            }
 
-            float load = Mathf.Clamp01(currentSpeed / topSpeedKmh);
-            engineAudioSource.pitch = Mathf.Lerp(engineIdlePitch, engineMaxPitch, load);
-            engineRPM = Mathf.Lerp(600f, 3500f, load);
+            if (!engineAudioSource.isPlaying)
+            {
+                engineAudioSource.loop = true;
+                engineAudioSource.Play();
+            }
+
+            float load = Mathf.Clamp01(Mathf.Abs(currentSpeed) / topSpeedKmh);
+            float rpmRatio = Mathf.Lerp(0.25f, 1.0f, load + (_isPerformingDigCycle ? 0.4f : 0f));
+            engineAudioSource.pitch = Mathf.Lerp(0.65f, 1.85f, rpmRatio);
+            engineAudioSource.volume = Mathf.Lerp(0.40f, 0.90f, 0.4f + 0.6f * Mathf.Abs(InputManagerProxy.Throttle));
         }
 
-        public override string GetVehicleInfo()
+        public static AudioClip CreateProceduralExcavatorDieselClip()
         {
-            return $"Excavator | Speed: {currentSpeed:F1} km/h | " +
-                   $"Soil: {currentSoilVolume * 100f:F0}% | Fuel: {fuelLevel:F0}%";
+            int sampleRate = 22050;
+            float duration = 0.5f;
+            int totalSamples = Mathf.FloorToInt(sampleRate * duration);
+            float[] samples = new float[totalSamples];
+
+            float fundamentalFreq = 28f; // ~28 Hz heavy 6-cylinder diesel idle
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = (float)i / sampleRate;
+                float s1 = Mathf.Sin(2f * Mathf.PI * fundamentalFreq * t);
+                float s2 = 0.6f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 2f * t);
+                float s3 = 0.35f * Mathf.Sin(2f * Mathf.PI * fundamentalFreq * 3f * t);
+                float hydraulicHum = 0.09f * Mathf.Sin(2f * Mathf.PI * 380f * t); // Hydraulic pump hum
+                float noise = (UnityEngine.Random.value * 2f - 1f) * 0.12f;
+                samples[i] = Mathf.Clamp((s1 + s2 + s3 + hydraulicHum + noise) * 0.35f, -1f, 1f);
+            }
+
+            var clip = AudioClip.Create("Synthesized_Excavator_Diesel", totalSamples, 1, sampleRate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
+
+        private void OnCollisionEnter(Collision collision)
+        {
+            float impactForce = collision.relativeVelocity.magnitude;
+            if (impactForce > 4.0f)
+            {
+                float dmg = (impactForce - 4.0f) * 1.5f;
+                damageLevel = Mathf.Clamp(damageLevel + dmg, 0f, 100f);
+            }
+        }
+
+        private void ConsumeFuel()
+        {
+            if (fuelLevel > 0f)
+                fuelLevel -= Time.fixedDeltaTime * 0.015f * Mathf.Abs(InputManagerProxy.Throttle);
+        }
+
+        public override string GetVehicleInfo() => "Tracked Excavator";
     }
 }

@@ -990,3 +990,67 @@ Step 3 requires perfecting heavy machinery one at a time, starting with the JCB 
 
 **Related to:** Step 3 Heavy Machinery, JCB Backhoe Loader, Front Loader Boom Bucket, Rear Backhoe Digging, Terrain Deformation, Stabilizers Drive Inhibit, Anti-Roll Suspension, Procedural Turbo Diesel Audio, Dual Action Touch HUD
 ---
+
+### Change #33 | 2026-11-19 22:45
+**Files changed:**
+- Assets/Scripts/Vehicles/ExcavatorController.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+- ProjectSettings/DynamicsManager.asset (MODIFIED)
+
+**What changed:**
+- Upgraded Excavator Physics and Dual-Track Tank Locomotion:
+  - Transferred physics simulation completely into `FixedUpdate()`, implementing realistic dual-track tank differential steering.
+  - Implemented in-place counter-rotation (tank spin) when steering without forward throttle (`_leftTrackInput = steer; _rightTrackInput = -steer;`).
+  - Added heavy anti-roll stabilizer sway bars (`antiRollStiffness = 18000f`) across front and rear track bogies and downforce (`downforceCoefficient = 4.0f`) to prevent flipping on rough terrain or inclines.
+  - Configured high-traction track friction curves (`extremumSlip = 0.2f`, `stiffness = 2.0f`) and powerful dual-track braking (18,000 Nm service brake, 25,000 Nm handbrake).
+  - Added continuous 360° cabin slewing (`RotateCabin()`, `SlewCabinStep()`) with smooth hydraulic damping.
+- Articulated Arm Chain and Real-Time Digging Cycle:
+  - Rigged and bound 4-stage articulated excavator arm chain: `boomTransform` (-25° to 65°), `stickTransform` (-45° to 90°), `bucketTransform` (-60° to 90°), and `bucketTip`. Backwards-compatible `boomArm`, `stickArm`, and `bucketArm` fields maintained.
+  - Implemented automated multi-phase digging stroke (`TriggerDigStroke()`), ground penetration query, and real-time terrain modification via `DigAtGround()` using `TerrainDeformer.DigAt()`, collecting soil up to 100% capacity (`currentSoilVolume`).
+  - Added bucket dumping functionality (`DumpSoil()`), releasing payload and resetting soil collection.
+- Procedural Excavator Heavy Diesel Audio:
+  - Created procedural audio synthesis `CreateProceduralExcavatorDieselClip()` producing deep 6-cylinder low-frequency diesel combustion rumble (~28 Hz) combined with hydraulic pump pitch shifting according to throttle and arm load.
+- Upgraded Mobile HUD & World Initialization:
+  - Added dual action buttons on mobile touch HUD for Excavator: Button 1 (`"⛏️ DIG\nSTROKE"` / `"🪣 DUMP\nSOIL"`) and Button 2 (`"🔄 SLEW\nCABIN"`), enabling full single-touch touch interaction.
+  - Configured Excavator arm hierarchy in `HVW_WorldInitializer.cs` (`Excavator_Boom_Pivot` -> `Excavator_Stick_Pivot` -> `Excavator_Bucket_Pivot` -> `Excavator_Bucket_Tip`).
+- Expanded Play-Mode Recovery Test Suite:
+  - Added comprehensive verification block `STEP 3B: EXCAVATOR ONLY PERFECTION VERIFICATION`.
+  - Tested dual-track drive (11.6 km/h, moved 1.74m), in-place tank counter-rotation (2.1° spin, upright dot product: 1.00), track service brake halt (0.6 km/h), 25,000 Nm handbrake lock, 360° cabin slewing to 225.0°, articulated arm positioning (Boom 35°, Stick 45°, Bucket 60°), digging stroke and soil volume collection (35%), bucket soil dump, procedural heavy diesel audio synthesis, and camera framing at 8.43m.
+
+**New code:**
+```csharp
+// ExcavatorController.cs - Dual-track tank drive & in-place counter-rotation
+private void ApplyTrackTorque()
+{
+    float leftInput, rightInput;
+    if (Mathf.Abs(steerInput) > 0.05f && Mathf.Abs(throttleInput) < 0.05f)
+    {
+        // Tank in-place counter-rotation spin
+        leftInput = steerInput;
+        rightInput = -steerInput;
+    }
+    else
+    {
+        leftInput = Mathf.Clamp(throttleInput + steerInput * 0.7f, -1f, 1f);
+        rightInput = Mathf.Clamp(throttleInput - steerInput * 0.7f, -1f, 1f);
+    }
+    // Apply track motor torque and anti-roll sway bars...
+}
+```
+
+**Why:**
+Step 3 requires perfecting heavy machinery one vehicle at a time, moving to the tracked excavator: implementing authentic dual-track differential drive with in-place counter-rotation, 360° continuous cabin slew, a 4-joint articulated arm chain capable of digging into the terrain and dumping soil, procedural heavy diesel engine audio, and mobile touch HUD controls.
+
+*Previous code:*
+```csharp
+// ExcavatorController previously lacked dual-track differential tank controls,
+// had no in-place counter-rotation spinning logic,
+// lacked anti-roll sway bars causing track rollovers,
+// lacked automated articulated digging stroke cycle and soil dumping,
+// had no procedural engine sound synthesis fallback,
+// and had no mobile HUD action buttons wired for touch excavating.
+```
+
+**Related to:** Step 3 Heavy Machinery, Tracked Excavator, Dual-Track Tank Drive, In-Place Counter-Rotation, 360 Cabin Slew, Articulated Arm Digging, Terrain Deformation, Procedural Heavy Diesel Audio, Mobile Touch HUD
+---

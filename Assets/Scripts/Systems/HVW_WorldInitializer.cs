@@ -658,22 +658,44 @@ namespace HeavyVehiclesWorld.Systems
                 case VehicleType.Excavator:
                     CreateBox("Excavator_Tracks", placeholderGo.transform, new Vector3(0f, bodySize.y * 0.22f, 0f), new Vector3(bodySize.x, bodySize.y * 0.32f, bodySize.z), steelMat);
 
+                    // 360-degree Rotating Turret / Cabin
                     var cabinPivot = new GameObject("RotatingCabin_Pivot");
                     cabinPivot.transform.SetParent(placeholderGo.transform, false);
                     cabinPivot.transform.localPosition = new Vector3(0f, bodySize.y * 0.38f, 0f);
                     CreateBox("Excavator_CabinBody", cabinPivot.transform, new Vector3(0f, bodySize.y * 0.35f, -bodySize.z * 0.08f), new Vector3(bodySize.x * 0.85f, bodySize.y * 0.6f, bodySize.z * 0.75f), bodyMat);
 
-                    var excBoom = new GameObject("Excavator_Boom");
-                    excBoom.transform.SetParent(cabinPivot.transform, false);
-                    excBoom.transform.localPosition = new Vector3(0.5f, bodySize.y * 0.4f, 0.8f);
-                    CreateBox("Boom_Bar", excBoom.transform, new Vector3(0f, 0.6f, 1.0f), new Vector3(0.35f, 0.35f, 2.2f), bodyMat);
-                    CreateBox("Bucket_Tool", excBoom.transform, new Vector3(0f, 0.1f, 2.2f), new Vector3(0.7f, 0.6f, 0.7f), steelMat);
+                    // Multi-joint Articulated Excavator Arm Chain
+                    var excBoomPivot = new GameObject("Excavator_Boom_Pivot");
+                    excBoomPivot.transform.SetParent(cabinPivot.transform, false);
+                    excBoomPivot.transform.localPosition = new Vector3(0.45f, bodySize.y * 0.42f, 0.75f);
+                    CreateBox("Boom_Bar", excBoomPivot.transform, new Vector3(0f, 0.7f, 1.1f), new Vector3(0.35f, 0.35f, 2.4f), bodyMat);
+
+                    var excStickPivot = new GameObject("Excavator_Stick_Pivot");
+                    excStickPivot.transform.SetParent(excBoomPivot.transform, false);
+                    excStickPivot.transform.localPosition = new Vector3(0f, 1.4f, 2.2f);
+                    CreateBox("Stick_Bar", excStickPivot.transform, new Vector3(0f, -0.6f, 0.7f), new Vector3(0.30f, 0.30f, 1.6f), bodyMat);
+
+                    var excBucketPivot = new GameObject("Excavator_Bucket_Pivot");
+                    excBucketPivot.transform.SetParent(excStickPivot.transform, false);
+                    excBucketPivot.transform.localPosition = new Vector3(0f, -1.2f, 1.4f);
+                    CreateBox("Bucket_Tool", excBucketPivot.transform, new Vector3(0f, -0.1f, 0.2f), new Vector3(0.75f, 0.65f, 0.75f), steelMat);
+
+                    var excBucketTip = new GameObject("Excavator_Bucket_Tip");
+                    excBucketTip.transform.SetParent(excBucketPivot.transform, false);
+                    excBucketTip.transform.localPosition = new Vector3(0f, -0.4f, 0.5f);
 
                     slot.rotatingCabin = cabinPivot.transform;
-                    slot.boomArm = excBoom.transform;
+                    slot.boomArm = excBoomPivot.transform;
+                    slot.stickArm = excStickPivot.transform;
+                    slot.bucket = excBucketPivot.transform;
+
                     if (ctrl is ExcavatorController ec)
                     {
                         ec.cabinTransform = cabinPivot.transform;
+                        ec.boomTransform = excBoomPivot.transform;
+                        ec.stickTransform = excStickPivot.transform;
+                        ec.bucketTransform = excBucketPivot.transform;
+                        ec.bucketTip = excBucketTip.transform;
                     }
                     break;
 
@@ -1164,6 +1186,21 @@ namespace HeavyVehiclesWorld.Systems
                 }
                 UpdateActionUI();
             }
+            else if (_activeVehicle is ExcavatorController ec)
+            {
+                if (buttonIndex == 1)
+                {
+                    if (ec.currentSoilVolume > 0.05f)
+                        ec.DumpSoil();
+                    else
+                        ec.TriggerDigStroke();
+                }
+                else
+                {
+                    ec.SlewCabinStep(1f);
+                }
+                UpdateActionUI();
+            }
             else if (_activeVehicle is HarvesterController hc)
             {
                 hc.RaiseLowerHeader(!hc.headerLowered);
@@ -1200,6 +1237,19 @@ namespace HeavyVehiclesWorld.Systems
                     _actionButtonGo2.SetActive(true);
                     if (_actionButtonLabel2 != null)
                         _actionButtonLabel2.text = "⛏️ DIG\nSTROKE";
+                }
+            }
+            else if (_activeVehicle is ExcavatorController ec)
+            {
+                _actionButtonGo.SetActive(true);
+                if (_actionButtonLabel != null)
+                    _actionButtonLabel.text = (ec.currentSoilVolume > 0.05f) ? "🪣 DUMP\nSOIL" : "⛏️ DIG\nSTROKE";
+
+                if (_actionButtonGo2 != null)
+                {
+                    _actionButtonGo2.SetActive(true);
+                    if (_actionButtonLabel2 != null)
+                        _actionButtonLabel2.text = "🔄 SLEW\nCABIN";
                 }
             }
             else if (_activeVehicle is HarvesterController hc)
