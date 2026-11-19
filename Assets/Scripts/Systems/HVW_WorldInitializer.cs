@@ -29,6 +29,9 @@ namespace HeavyVehiclesWorld.Systems
         private Text _actionButtonLabel;
         private GameObject _actionButtonGo2;
         private Text _actionButtonLabel2;
+        private GameObject _settingsModalPanel;
+        private Text _gfxQualityStatusText;
+        private Text _fpsCapStatusText;
 
         private bool _steerLeftHeld;
         private bool _steerRightHeld;
@@ -931,7 +934,7 @@ namespace HeavyVehiclesWorld.Systems
             // ── Right: Pedals & Handbrake ─────────────────────────────────────
             // Gas Pedal (Large Green)
             CreateTouchButton(canvasGo, "Btn_Gas", "GAS / ACCEL\n▲",
-                new Vector2(1f, 0f), new Vector2(-130f, 160f), new Vector2(140f, 210f),
+                new Vector2(1f, 0f), new Vector2(-130f, 150f), new Vector2(140f, 190f),
                 new Color(0.12f, 0.65f, 0.25f, 0.90f),
                 () => { _accelHeld = true; },
                 () => { _accelHeld = false; });
@@ -952,14 +955,14 @@ namespace HeavyVehiclesWorld.Systems
 
             // Vehicle Action Button 1 (Dump Bed / Loader / Plough / Header)
             _actionButtonGo = CreateClickButton(canvasGo, "Btn_VehicleAction", "ACTION",
-                new Vector2(1f, 0f), new Vector2(-130f, 290f), new Vector2(140f, 65f),
+                new Vector2(1f, 0f), new Vector2(-130f, 290f), new Vector2(140f, 55f),
                 new Color(0.92f, 0.45f, 0.12f, 0.92f),
                 () => { TriggerVehicleAction(1); });
             _actionButtonLabel = _actionButtonGo.GetComponentInChildren<Text>();
 
             // Vehicle Action Button 2 (Digging / Slew / Auger)
             _actionButtonGo2 = CreateClickButton(canvasGo, "Btn_VehicleAction2", "ACTION 2",
-                new Vector2(1f, 0f), new Vector2(-130f, 365f), new Vector2(140f, 65f),
+                new Vector2(1f, 0f), new Vector2(-130f, 360f), new Vector2(140f, 55f),
                 new Color(0.15f, 0.65f, 0.95f, 0.92f),
                 () => { TriggerVehicleAction(2); });
             _actionButtonLabel2 = _actionButtonGo2.GetComponentInChildren<Text>();
@@ -978,22 +981,28 @@ namespace HeavyVehiclesWorld.Systems
             for (int i = 0; i < vehicleDefs.Length; i++)
             {
                 int idx = i;
-                float xPos = 48f + (i * 90f);
+                float xPos = 46f + (i * 88f);
                 CreateClickButton(canvasGo, $"Btn_Select_{vehicleDefs[i].type}", vehicleDefs[i].label,
-                    new Vector2(0f, 1f), new Vector2(xPos, -22f), new Vector2(86f, 30f),
+                    new Vector2(0f, 1f), new Vector2(xPos, -22f), new Vector2(82f, 30f),
                     new Color(0.12f, 0.45f, 0.78f, 0.90f),
                     () => { SwitchToVehicleIndex(idx); });
             }
 
+            // Settings Button (Top-Right, Row 1)
+            CreateClickButton(canvasGo, "Btn_Settings", "⚙️ SETTINGS",
+                new Vector2(1f, 1f), new Vector2(-212f, -22f), new Vector2(76f, 30f),
+                new Color(0.25f, 0.35f, 0.45f, 0.90f),
+                () => { ToggleSettingsPanel(); });
+
             // Camera Toggle Button (Top-Right, Row 1)
             CreateClickButton(canvasGo, "Btn_CamView", "📷 VIEW",
-                new Vector2(1f, 1f), new Vector2(-145f, -22f), new Vector2(84f, 30f),
+                new Vector2(1f, 1f), new Vector2(-130f, -22f), new Vector2(76f, 30f),
                 new Color(0.25f, 0.25f, 0.30f, 0.90f),
                 () => { if (_followCamera) _followCamera.ToggleCameraMode(); });
 
             // Reset Vehicle Button (Top-Right, Row 1)
             CreateClickButton(canvasGo, "Btn_ResetVeh", "🔄 RESET",
-                new Vector2(1f, 1f), new Vector2(-52f, -22f), new Vector2(84f, 30f),
+                new Vector2(1f, 1f), new Vector2(-48f, -22f), new Vector2(76f, 30f),
                 new Color(0.35f, 0.35f, 0.40f, 0.90f),
                 () => { ResetActiveVehicle(); });
 
@@ -1011,6 +1020,135 @@ namespace HeavyVehiclesWorld.Systems
             _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 22, TextAnchor.MiddleCenter, new Vector2(0f, 8f), new Vector2(260f, 26f), Color.white);
             _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 13, TextAnchor.MiddleCenter, new Vector2(-70f, -14f), new Vector2(110f, 20f), new Color(0.4f, 0.85f, 1f));
             _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 13, TextAnchor.MiddleCenter, new Vector2(70f, -14f), new Vector2(120f, 20f), new Color(1f, 0.85f, 0.3f));
+
+            // Build Settings Modal Dialog
+            BuildSettingsModal(canvasGo);
+        }
+
+        private void BuildSettingsModal(GameObject canvasGo)
+        {
+            _settingsModalPanel = new GameObject("Panel_SettingsModal");
+            _settingsModalPanel.transform.SetParent(canvasGo.transform, false);
+            var rect = _settingsModalPanel.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(560f, 380f);
+
+            var bgImg = _settingsModalPanel.AddComponent<Image>();
+            bgImg.color = new Color(0.10f, 0.12f, 0.16f, 0.96f);
+
+            // Title
+            CreateText(_settingsModalPanel, "Txt_SettingsTitle", "⚙️ GRAPHICS & PERFORMANCE SETTINGS", 20, TextAnchor.MiddleCenter, new Vector2(0f, 150f), new Vector2(520f, 36f), Color.white);
+
+            // Graphics Quality Section
+            CreateText(_settingsModalPanel, "Lbl_GfxQuality", "GRAPHICS QUALITY:", 16, TextAnchor.MiddleLeft, new Vector2(-120f, 95f), new Vector2(260f, 28f), new Color(0.4f, 0.85f, 1f));
+            int curQIdx = QualitySettings.GetQualityLevel();
+            string qName = (curQIdx >= 0 && curQIdx < QualitySettings.names.Length) ? QualitySettings.names[curQIdx] : $"Tier {curQIdx}";
+            _gfxQualityStatusText = CreateText(_settingsModalPanel, "Txt_QualityStatus", $"CURRENT: {qName}", 14, TextAnchor.MiddleRight, new Vector2(140f, 95f), new Vector2(220f, 28f), new Color(1f, 0.85f, 0.3f));
+
+            CreateClickButton(_settingsModalPanel, "Btn_Quality_Low", "LOW (Fast)", new Vector2(0.5f, 0.5f), new Vector2(-160f, 50f), new Vector2(140f, 38f), new Color(0.20f, 0.45f, 0.25f, 0.90f), () => SetGraphicsQuality(0));
+            CreateClickButton(_settingsModalPanel, "Btn_Quality_Medium", "MEDIUM", new Vector2(0.5f, 0.5f), new Vector2(0f, 50f), new Vector2(140f, 38f), new Color(0.20f, 0.40f, 0.65f, 0.90f), () => SetGraphicsQuality(1));
+            CreateClickButton(_settingsModalPanel, "Btn_Quality_High", "HIGH (PBR)", new Vector2(0.5f, 0.5f), new Vector2(160f, 50f), new Vector2(140f, 38f), new Color(0.55f, 0.25f, 0.55f, 0.90f), () => SetGraphicsQuality(2));
+
+            // FPS Cap Section
+            CreateText(_settingsModalPanel, "Lbl_FPSCap", "FRAME RATE CAP:", 16, TextAnchor.MiddleLeft, new Vector2(-120f, -10f), new Vector2(260f, 28f), new Color(0.4f, 0.85f, 1f));
+            string curFpsText = Application.targetFrameRate > 0 ? $"{Application.targetFrameRate} FPS" : "UNCAPPED";
+            _fpsCapStatusText = CreateText(_settingsModalPanel, "Txt_FPSStatus", $"CURRENT: {curFpsText}", 14, TextAnchor.MiddleRight, new Vector2(140f, -10f), new Vector2(220f, 28f), new Color(1f, 0.85f, 0.3f));
+
+            CreateClickButton(_settingsModalPanel, "Btn_FPS_30", "30 FPS (Battery)", new Vector2(0.5f, 0.5f), new Vector2(-160f, -55f), new Vector2(140f, 38f), new Color(0.20f, 0.45f, 0.25f, 0.90f), () => SetFPSCap(30));
+            CreateClickButton(_settingsModalPanel, "Btn_FPS_60", "60 FPS (Smooth)", new Vector2(0.5f, 0.5f), new Vector2(0f, -55f), new Vector2(140f, 38f), new Color(0.20f, 0.40f, 0.65f, 0.90f), () => SetFPSCap(60));
+            CreateClickButton(_settingsModalPanel, "Btn_FPS_Uncapped", "UNCAPPED", new Vector2(0.5f, 0.5f), new Vector2(160f, -55f), new Vector2(140f, 38f), new Color(0.55f, 0.35f, 0.15f, 0.90f), () => SetFPSCap(-1));
+
+            // Close Button
+            CreateClickButton(_settingsModalPanel, "Btn_CloseSettings", "✕ CLOSE", new Vector2(0.5f, 0.5f), new Vector2(0f, -135f), new Vector2(180f, 42f), new Color(0.75f, 0.20f, 0.20f, 0.95f), () => ToggleSettingsPanel());
+
+            _settingsModalPanel.SetActive(false);
+        }
+
+        public void ToggleSettingsPanel()
+        {
+            if (_settingsModalPanel != null)
+            {
+                bool active = !_settingsModalPanel.activeSelf;
+                _settingsModalPanel.SetActive(active);
+                if (active) UpdateSettingsLabels();
+            }
+        }
+
+        public void SetGraphicsQuality(int level)
+        {
+            int targetQuality = Mathf.Clamp(level * 2, 0, QualitySettings.names.Length - 1);
+            QualitySettings.SetQualityLevel(targetQuality, true);
+
+            var mgr = GraphicsSettingsManager.Instance;
+            if (mgr != null)
+            {
+                mgr.ApplyQuality((HeavyVehiclesWorld.Systems.QualityLevel)level);
+            }
+            else
+            {
+                PlayerPrefs.SetInt("Settings_GraphicsQuality", level);
+                PlayerPrefs.Save();
+            }
+
+            if (level == 0)
+            {
+                QualitySettings.shadows = ShadowQuality.Disable;
+                QualitySettings.shadowDistance = 25f;
+            }
+            else if (level == 1)
+            {
+                QualitySettings.shadows = ShadowQuality.HardOnly;
+                QualitySettings.shadowDistance = 75f;
+            }
+            else
+            {
+                QualitySettings.shadows = ShadowQuality.All;
+                QualitySettings.shadowDistance = 150f;
+            }
+
+            UpdateSettingsLabels();
+            Debug.Log($"[Settings] Graphics Quality changed to: {QualitySettings.names[QualitySettings.GetQualityLevel()]} (tier {level})");
+        }
+
+        public void SetFPSCap(int fps)
+        {
+            Application.targetFrameRate = fps;
+            var mgr = GraphicsSettingsManager.Instance;
+            if (mgr != null)
+            {
+                FPSCap cap = fps switch
+                {
+                    30 => FPSCap.Cap30,
+                    60 => FPSCap.Cap60,
+                    _  => FPSCap.Uncapped
+                };
+                mgr.SetFPSCap(cap);
+            }
+            else
+            {
+                PlayerPrefs.SetInt("Settings_FPSCap", fps);
+                PlayerPrefs.Save();
+            }
+
+            UpdateSettingsLabels();
+            Debug.Log($"[Settings] Target frame rate changed to: {(fps > 0 ? fps + " FPS" : "Uncapped")}");
+        }
+
+        private void UpdateSettingsLabels()
+        {
+            if (_gfxQualityStatusText != null)
+            {
+                int qIdx = QualitySettings.GetQualityLevel();
+                string qName = (qIdx >= 0 && qIdx < QualitySettings.names.Length) ? QualitySettings.names[qIdx] : $"Tier {qIdx}";
+                _gfxQualityStatusText.text = $"CURRENT: {qName}";
+            }
+            if (_fpsCapStatusText != null)
+            {
+                string fpsText = Application.targetFrameRate > 0 ? $"{Application.targetFrameRate} FPS" : "UNCAPPED";
+                _fpsCapStatusText.text = $"CURRENT: {fpsText}";
+            }
         }
 
         private Text CreateText(GameObject parent, string name, string text, int fontSize, TextAnchor alignment, Vector2 pos, Vector2 size, Color col)

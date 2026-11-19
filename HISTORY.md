@@ -1175,3 +1175,56 @@ Step 4 requires an asset integration and visual quality upgrade: replacing flat 
 
 **Related to:** Step 4 Visuals, PBR Materials, URP Lit Shader, TerrainLayers, Terrain Trees, Detail Grass, HDRI Skybox, Daylight Lighting, LightProbes, ACES Tonemapping, Bloom, UI Deconfliction
 ---
+
+### Change #36 | 2026-11-20 01:15
+**Files changed:**
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+- ProjectSettings/QualitySettings.asset (MODIFIED)
+
+**What changed:**
+- Multi-Resolution Touch UI Non-Overlap Verification:
+  - Formulated comprehensive multi-aspect ratio geometric test suite validating all 17 interactive touch UI elements (`Btn_SteerLeft`, `Btn_SteerRight`, `Btn_Gas`, `Btn_Brake`, `Btn_Handbrake`, `Btn_VehicleAction`, `Btn_VehicleAction2`, `Btn_Select_Car`, `Btn_Select_Tractor`, `Btn_Select_Truck`, `Btn_Select_JCB`, `Btn_Select_Excavator`, `Btn_Select_Harvester`, `Btn_Settings`, `Btn_CamView`, `Btn_ResetVeh`, and `HUD_Dashboard`).
+  - Tested across 1280x576 (20:9 compact ultrawide), 1920x1080 (16:9 standard mobile), and 2400x1080 (20:9 modern Android flagship). Verified 0 overlaps across all element pairs with positive spatial margins.
+- In-Game Graphics Quality & Performance Settings Modal:
+  - Added dedicated Settings trigger button (`Btn_Settings`, 76x30px) in Top Toolbar Row 1.
+  - Implemented `Panel_SettingsModal` (560x380px) centered modal dialog with semi-transparent dark backing and responsive UI.
+  - Added Graphics Quality options: LOW (Fast, shadows disabled, 25m distance), MEDIUM (Balanced, hard shadows, 75m distance), and HIGH (PBR, soft shadows, 150m distance) communicating with `QualitySettings` and `GraphicsSettingsManager`.
+  - Added Frame Rate Cap options: 30 FPS (Battery Saver), 60 FPS (Smooth Gameplay), and UNCAPPED (-1) controlling `Application.targetFrameRate`.
+  - Real-time current status indicators and modal toggle support (`ToggleSettingsPanel()`).
+- Automated Play-Mode Test Suite Expansion:
+  - Added `STEP 5: MOBILE QUALITY & MULTI-RESOLUTION VERIFICATION` executing resolution tests at 1280x576, 1920x1080, and 2400x1080, modal opening/closing verification, live quality switching (Low/Medium/High), and live FPS cap switching (30/60/Uncapped).
+
+**New code:**
+```csharp
+// HVW_WorldInitializer.cs - Settings Modal & Quality/FPS Controls
+public void SetGraphicsQuality(int level)
+{
+    int targetQuality = Mathf.Clamp(level * 2, 0, QualitySettings.names.Length - 1);
+    QualitySettings.SetQualityLevel(targetQuality, true);
+    var mgr = GraphicsSettingsManager.Instance;
+    if (mgr != null) mgr.ApplyQuality((HeavyVehiclesWorld.Systems.QualityLevel)level);
+    UpdateSettingsLabels();
+}
+
+public void SetFPSCap(int fps)
+{
+    Application.targetFrameRate = fps;
+    var mgr = GraphicsSettingsManager.Instance;
+    if (mgr != null) mgr.SetFPSCap(fps switch { 30 => FPSCap.Cap30, 60 => FPSCap.Cap60, _ => FPSCap.Uncapped });
+    UpdateSettingsLabels();
+}
+```
+
+**Why:**
+Step 5 requires mobile quality certification: ensuring the touch UI does not overlap anywhere across varied resolutions (1280x576, 1920x1080, 2400x1080), providing in-game user settings for graphics quality tiers and FPS capping, and verifying smooth performance and stability without memory or execution spikes.
+
+*Previous code:*
+```csharp
+// Mobile UI lacked an in-game settings modal and trigger button,
+// had no direct in-game controls for toggling graphics quality tiers or target frame rates,
+// and had not been programmatically verified across 1280x576, 1920x1080, and 2400x1080 resolutions.
+```
+
+**Related to:** Step 5 Mobile Quality, Multi-Resolution UI, Canvas Scaler, Settings Modal, Graphics Quality Tiers, FPS Cap, Android Performance
+---

@@ -1106,6 +1106,151 @@ namespace HeavyVehiclesWorld.EditorTests
                 float gapY = row1BottomY - row2TopY;
                 Debug.Log($"✅ UI Deconfliction: Vehicle Switcher (Row 1 bottom Y={row1BottomY:F1}) is separated by {gapY:F1}px above Speed Panel (Row 2 top Y={row2TopY:F1}) with ZERO overlap.");
 
+                // ══════════════════════════════════════════════════════════════════════
+                // STEP 5: MOBILE QUALITY & MULTI-RESOLUTION VERIFICATION
+                // ══════════════════════════════════════════════════════════════════════
+                Debug.Log("\n--- [STEP 5: MOBILE QUALITY & MULTI-RESOLUTION VERIFICATION] ---");
+
+                // 1. Multi-Resolution UI Non-Overlap Verification (1280x576, 1920x1080, 2400x1080)
+                var testResolutions = new (int w, int h, string name)[]
+                {
+                    (1280, 576,  "1280x576 (20:9 Compact)"),
+                    (1920, 1080, "1920x1080 (16:9 Standard)"),
+                    (2400, 1080, "2400x1080 (20:9 Flagship)")
+                };
+
+                string[] uiElementNames = new string[]
+                {
+                    "Btn_SteerLeft", "Btn_SteerRight",
+                    "Btn_Gas", "Btn_Brake", "Btn_Handbrake",
+                    "Btn_VehicleAction", "Btn_VehicleAction2",
+                    "Btn_Select_Car", "Btn_Select_Tractor", "Btn_Select_Truck",
+                    "Btn_Select_JCB", "Btn_Select_Excavator", "Btn_Select_Harvester",
+                    "Btn_Settings", "Btn_CamView", "Btn_ResetVeh",
+                    "HUD_Dashboard"
+                };
+
+                var canvasGo = GameObject.Find("HVW_MobileCanvas");
+                if (canvasGo == null) throw new Exception("HVW_MobileCanvas not found!");
+                var allCanvasRects = canvasGo.GetComponentsInChildren<RectTransform>(true);
+
+                var uiElements = new List<(string name, RectTransform rect)>();
+                foreach (var elName in uiElementNames)
+                {
+                    RectTransform foundRt = null;
+                    foreach (var rt in allCanvasRects)
+                    {
+                        if (rt.name == elName)
+                        {
+                            foundRt = rt;
+                            break;
+                        }
+                    }
+                    if (foundRt == null) throw new Exception($"Required UI element '{elName}' not found in Canvas!");
+                    uiElements.Add((elName, foundRt));
+                }
+
+                foreach (var res in testResolutions)
+                {
+                    // Compute canvas reference dimensions using CanvasScaler logic (match = 0.5)
+                    float scale = Mathf.Sqrt(((float)res.w * res.h) / (1920f * 1080f));
+                    float canvasW = res.w / scale;
+                    float canvasH = res.h / scale;
+
+                    var computedRects = new List<(string name, Rect bounds)>();
+
+                    foreach (var elem in uiElements)
+                    {
+                        var rt = elem.rect;
+                        Vector2 anchorMin = rt.anchorMin;
+                        Vector2 anchorMax = rt.anchorMax;
+                        Vector2 anchoredPos = rt.anchoredPosition;
+                        Vector2 size = rt.sizeDelta;
+
+                        float anchorMinX = anchorMin.x * canvasW;
+                        float anchorMaxX = anchorMax.x * canvasW;
+                        float anchorMinY = anchorMin.y * canvasH;
+                        float anchorMaxY = anchorMax.y * canvasH;
+
+                        float centerX = (anchorMinX + anchorMaxX) * 0.5f + anchoredPos.x;
+                        float centerY = (anchorMinY + anchorMaxY) * 0.5f + anchoredPos.y;
+
+                        float minX = centerX - (size.x * 0.5f);
+                        float maxX = centerX + (size.x * 0.5f);
+                        float minY = centerY - (size.y * 0.5f);
+                        float maxY = centerY + (size.y * 0.5f);
+
+                        computedRects.Add((elem.name, Rect.MinMaxRect(minX, minY, maxX, maxY)));
+                    }
+
+                    // Check all pairs for overlap
+                    for (int i = 0; i < computedRects.Count; i++)
+                    {
+                        for (int j = i + 1; j < computedRects.Count; j++)
+                        {
+                            var rA = computedRects[i].bounds;
+                            var rB = computedRects[j].bounds;
+
+                            // Allow adjacent elements that share borders (epsilon = 0.5px tolerance)
+                            bool xOverlap = (rA.xMax - 0.5f > rB.xMin) && (rB.xMax - 0.5f > rA.xMin);
+                            bool yOverlap = (rA.yMax - 0.5f > rB.yMin) && (rB.yMax - 0.5f > rA.yMin);
+
+                            if (xOverlap && yOverlap)
+                            {
+                                throw new Exception($"UI Overlap at {res.name}! '{computedRects[i].name}' {rA} overlaps with '{computedRects[j].name}' {rB}!");
+                            }
+                        }
+                    }
+                    Debug.Log($"✅ UI Non-Overlap Verified at {res.name}: All {computedRects.Count} touch elements 100% deconflicted (0 overlaps).");
+                }
+
+                // 2. Settings Option for Graphics Quality and FPS Cap
+                var settingsBtn = GameObject.Find("Btn_Settings");
+                if (settingsBtn == null) throw new Exception("Btn_Settings GameObject not found!");
+                var settingsPanel = canvasGo.transform.Find("Panel_SettingsModal")?.gameObject;
+                if (settingsPanel == null) throw new Exception("Panel_SettingsModal GameObject not found!");
+
+                var worldInit = HeavyVehiclesWorld.Systems.HVW_WorldInitializer.Instance;
+                if (worldInit == null) throw new Exception("HVW_WorldInitializer instance is NULL!");
+
+                // Toggle Open
+                worldInit.ToggleSettingsPanel();
+                if (!settingsPanel.activeSelf)
+                    throw new Exception("Settings modal panel failed to open on Toggle!");
+                Debug.Log("✅ Settings Menu: Modal panel toggled OPEN.");
+
+                // Test Graphics Quality Tiers: Low (0), Medium (1), High (2)
+                worldInit.SetGraphicsQuality(0);
+                if (QualitySettings.shadows != ShadowQuality.Disable)
+                    throw new Exception("Low Quality did not disable shadows!");
+
+                worldInit.SetGraphicsQuality(2);
+                if (QualitySettings.shadows != ShadowQuality.All || QualitySettings.shadowDistance < 100f)
+                    throw new Exception("High Quality did not set high shadow distance!");
+
+                worldInit.SetGraphicsQuality(1); // Restore Medium
+                Debug.Log("✅ Graphics Quality Setting: Successfully switched tiers (Low, Medium, High).");
+
+                // Test FPS Cap Tiers: 30, 60, Uncapped (-1)
+                worldInit.SetFPSCap(30);
+                if (Application.targetFrameRate != 30)
+                    throw new Exception($"Target frame rate failed to set 30! Current: {Application.targetFrameRate}");
+
+                worldInit.SetFPSCap(-1);
+                if (Application.targetFrameRate != -1)
+                    throw new Exception($"Target frame rate failed to set Uncapped (-1)! Current: {Application.targetFrameRate}");
+
+                worldInit.SetFPSCap(60); // Restore 60 FPS
+                if (Application.targetFrameRate != 60)
+                    throw new Exception($"Target frame rate failed to set 60! Current: {Application.targetFrameRate}");
+                Debug.Log("✅ FPS Cap Setting: Successfully switched target frame rates (30 FPS, 60 FPS, Uncapped).");
+
+                // Toggle Close
+                worldInit.ToggleSettingsPanel();
+                if (settingsPanel.activeSelf)
+                    throw new Exception("Settings modal panel failed to close on Toggle!");
+                Debug.Log("✅ Settings Menu: Modal panel toggled CLOSED.");
+
                 // Reset inputs & simulation mode
                 InputManagerProxy.MobileThrottle = 0f;
                 InputManagerProxy.MobileBrake = 0f;
@@ -1113,7 +1258,7 @@ namespace HeavyVehiclesWorld.EditorTests
                 Physics.simulationMode = SimulationMode.FixedUpdate;
 
                 Debug.Log("\n================================================================================");
-                Debug.Log("🎉 [RECOVERY & STEP 4 TEST PASSED] All 6 vehicles and Visual PBR System 100% verified!");
+                Debug.Log("🎉 [RECOVERY, STEP 4 & STEP 5 TEST PASSED] All 6 vehicles, Visual PBR, and Mobile Quality 100% verified!");
                 Debug.Log("================================================================================");
             }
             catch (Exception ex)
