@@ -964,7 +964,7 @@ namespace HeavyVehiclesWorld.Systems
                 () => { TriggerVehicleAction(2); });
             _actionButtonLabel2 = _actionButtonGo2.GetComponentInChildren<Text>();
 
-            // ── Top Toolbar: Vehicle Switcher ────────────────────────────────
+            // ── Top Toolbar: Vehicle Switcher (Row 1: Y = -22f) ────────────────
             var vehicleDefs = new (string label, VehicleType type)[]
             {
                 ("🚗 CAR", VehicleType.Car),
@@ -978,39 +978,39 @@ namespace HeavyVehiclesWorld.Systems
             for (int i = 0; i < vehicleDefs.Length; i++)
             {
                 int idx = i;
-                float xPos = 60f + (i * 112f);
+                float xPos = 48f + (i * 90f);
                 CreateClickButton(canvasGo, $"Btn_Select_{vehicleDefs[i].type}", vehicleDefs[i].label,
-                    new Vector2(0f, 1f), new Vector2(xPos, -35f), new Vector2(104f, 38f),
+                    new Vector2(0f, 1f), new Vector2(xPos, -22f), new Vector2(86f, 30f),
                     new Color(0.12f, 0.45f, 0.78f, 0.90f),
                     () => { SwitchToVehicleIndex(idx); });
             }
 
-            // Camera Toggle Button (Top-Right)
+            // Camera Toggle Button (Top-Right, Row 1)
             CreateClickButton(canvasGo, "Btn_CamView", "📷 VIEW",
-                new Vector2(1f, 1f), new Vector2(-170f, -35f), new Vector2(100f, 38f),
+                new Vector2(1f, 1f), new Vector2(-145f, -22f), new Vector2(84f, 30f),
                 new Color(0.25f, 0.25f, 0.30f, 0.90f),
                 () => { if (_followCamera) _followCamera.ToggleCameraMode(); });
 
-            // Reset Vehicle Button (Top-Right)
+            // Reset Vehicle Button (Top-Right, Row 1)
             CreateClickButton(canvasGo, "Btn_ResetVeh", "🔄 RESET",
-                new Vector2(1f, 1f), new Vector2(-60f, -35f), new Vector2(100f, 38f),
+                new Vector2(1f, 1f), new Vector2(-52f, -22f), new Vector2(84f, 30f),
                 new Color(0.35f, 0.35f, 0.40f, 0.90f),
                 () => { ResetActiveVehicle(); });
 
-            // ── Top Center: Speedometer & Dashboard HUD (Deconflicted Layout) ───
+            // ── Speedometer & Dashboard HUD (Row 2: Y = -72f, strictly below Row 1) ───
             var hudPanel = new GameObject("HUD_Dashboard");
             hudPanel.transform.SetParent(canvasGo.transform, false);
             var hudRect = hudPanel.AddComponent<RectTransform>();
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0f, -42f);
-            hudRect.sizeDelta = new Vector2(260f, 64f);
+            hudRect.anchoredPosition = new Vector2(0f, -72f);
+            hudRect.sizeDelta = new Vector2(280f, 52f);
             var hudImg = hudPanel.AddComponent<Image>();
             hudImg.color = new Color(0.08f, 0.08f, 0.10f, 0.85f);
 
-            _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 24, TextAnchor.MiddleCenter, new Vector2(0f, 10f), new Vector2(240f, 30f), Color.white);
-            _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 14, TextAnchor.MiddleCenter, new Vector2(-65f, -16f), new Vector2(110f, 24f), new Color(0.4f, 0.85f, 1f));
-            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 14, TextAnchor.MiddleCenter, new Vector2(65f, -16f), new Vector2(120f, 24f), new Color(1f, 0.85f, 0.3f));
+            _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 22, TextAnchor.MiddleCenter, new Vector2(0f, 8f), new Vector2(260f, 26f), Color.white);
+            _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 13, TextAnchor.MiddleCenter, new Vector2(-70f, -14f), new Vector2(110f, 20f), new Color(0.4f, 0.85f, 1f));
+            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 13, TextAnchor.MiddleCenter, new Vector2(70f, -14f), new Vector2(120f, 20f), new Color(1f, 0.85f, 0.3f));
         }
 
         private Text CreateText(GameObject parent, string name, string text, int fontSize, TextAnchor alignment, Vector2 pos, Vector2 size, Color col)

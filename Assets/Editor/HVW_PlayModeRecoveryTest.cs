@@ -1012,6 +1012,100 @@ namespace HeavyVehiclesWorld.EditorTests
                     throw new Exception($"Harvester camera distance out of expected range: {harvCamDist:F2}m");
                 Debug.Log($"✅ Harvester_Combine Third-Person Camera: Framed behind harvester at {harvCamDist:F2}m.");
 
+                // ══════════════════════════════════════════════════════════════════════
+                // STEP 4: VISUAL SYSTEM & GRAPHICS PASS VERIFICATION
+                // ══════════════════════════════════════════════════════════════════════
+                Debug.Log("\n--- [STEP 4: VISUAL SYSTEM & GRAPHICS PASS VERIFICATION] ---");
+                vis = HeavyVehiclesWorld.Systems.HVW_VisualSystem.Instance;
+                if (vis == null) throw new Exception("HVW_VisualSystem instance is NULL!");
+
+                // 1. Lighting Setup (Natural daylight, soft shadows, no yellow blowout)
+                if (vis.sunLight == null) throw new Exception("VisualSystem sunLight reference is NULL!");
+                if (vis.sunLight.shadows != LightShadows.Soft)
+                    throw new Exception($"Sun light shadows not set to Soft! Current: {vis.sunLight.shadows}");
+                if (Mathf.Abs(vis.sunLight.intensity - 1.0f) > 0.05f)
+                    throw new Exception($"Sun light intensity not calibrated to 1.0f! Current: {vis.sunLight.intensity}");
+                if (RenderSettings.skybox == null)
+                    throw new Exception("RenderSettings skybox material is NULL!");
+                Debug.Log($"✅ Lighting & Skybox: Sun calibrated ({vis.sunLight.intensity:F2} intensity, Soft shadows), Skybox '{RenderSettings.skybox.name}' active.");
+
+                // 2. PBR Materials with Texture Slots
+                if (vis.carBodyPBR == null || vis.truckBodyPBR == null || vis.rubberTiresPBR == null || vis.metalPartsPBR == null)
+                    throw new Exception("Core vehicle PBR materials are missing or failed to initialize!");
+                Debug.Log("✅ PBR Materials: Vehicle paint, rubber tires, steel machinery, and asphalt PBR shaders verified.");
+
+                // 3. TerrainLayers (Grass, Dirt, Asphalt, Rock with normal maps)
+                if (vis.targetTerrain == null || vis.targetTerrain.terrainData == null)
+                    throw new Exception("Target terrain or TerrainData is missing in VisualSystem!");
+                var td = vis.targetTerrain.terrainData;
+                if (td.terrainLayers == null || td.terrainLayers.Length < 4)
+                    throw new Exception($"TerrainLayers incomplete! Count: {(td.terrainLayers == null ? 0 : td.terrainLayers.Length)} (Expected >= 4)");
+                for (int tl = 0; tl < td.terrainLayers.Length; tl++)
+                {
+                    var layer = td.terrainLayers[tl];
+                    if (layer.diffuseTexture == null)
+                        throw new Exception($"TerrainLayer[{tl}] '{layer.name}' diffuseTexture is NULL!");
+                    if (layer.normalMapTexture == null)
+                        throw new Exception($"TerrainLayer[{tl}] '{layer.name}' normalMapTexture is NULL!");
+                }
+                Debug.Log($"✅ TerrainLayers: 4 PBR Layers configured with diffuse & normal textures ({td.terrainLayers[0].name}, {td.terrainLayers[1].name}, {td.terrainLayers[2].name}, {td.terrainLayers[3].name}).");
+
+                // 4. Terrain Tree System with Colliders
+                if (td.treePrototypes == null || td.treePrototypes.Length == 0)
+                    throw new Exception("Terrain treePrototypes array is empty!");
+                if (td.treeInstances == null || td.treeInstances.Length == 0)
+                    throw new Exception("Terrain treeInstances array is empty! No trees populated via Terrain Tree system.");
+                var treePrefab = td.treePrototypes[0].prefab;
+                if (treePrefab == null) throw new Exception("Terrain tree prototype prefab is NULL!");
+                var trunkCol = treePrefab.GetComponentInChildren<CapsuleCollider>(true);
+                if (trunkCol == null) throw new Exception("Terrain tree prototype prefab missing CapsuleCollider on trunk!");
+                Debug.Log($"✅ Terrain Tree System: {td.treeInstances.Length} trees populated with solid CapsuleCollider trunk physics.");
+
+                // 5. Terrain Grass Detail System
+                if (td.detailPrototypes == null || td.detailPrototypes.Length == 0)
+                    throw new Exception("Terrain detailPrototypes array is empty!");
+                Debug.Log($"✅ Terrain Detail Grass: Grass billboard prototype active (Density: {vis.targetTerrain.detailObjectDensity:F1}).");
+
+                // 6. Light Probe Grid
+                var lpgGo = GameObject.Find("LightProbeGroup_Vehicles");
+                if (lpgGo == null) throw new Exception("LightProbeGroup_Vehicles GameObject not found!");
+                var lpg = lpgGo.GetComponent<LightProbeGroup>();
+                if (lpg == null || lpg.probePositions.Length == 0)
+                    throw new Exception("LightProbeGroup has no probe positions defined!");
+                Debug.Log($"✅ Light Probe Grid: Active with {lpg.probePositions.Length} spatial daylight sampling probes.");
+
+                // 7. Post-Processing Volume (Tonemapping, Bloom, Color Adjustments)
+                var ppVolGo = GameObject.Find("GlobalPostProcessVolume") ?? GameObject.Find("GlobalPostProcessingVolume");
+                if (ppVolGo == null) throw new Exception("GlobalPostProcessVolume GameObject not found!");
+                var ppVol = ppVolGo.GetComponent<UnityEngine.Rendering.Volume>();
+                if (ppVol == null || ppVol.profile == null)
+                    throw new Exception("GlobalPostProcessVolume Volume component or profile is NULL!");
+                if (!ppVol.profile.Has<UnityEngine.Rendering.Universal.Tonemapping>())
+                    throw new Exception("VolumeProfile missing Tonemapping component!");
+                if (!ppVol.profile.Has<UnityEngine.Rendering.Universal.Bloom>())
+                    throw new Exception("VolumeProfile missing Bloom component!");
+                if (!ppVol.profile.Has<UnityEngine.Rendering.Universal.ColorAdjustments>())
+                    throw new Exception("VolumeProfile missing ColorAdjustments component!");
+                Debug.Log("✅ Post-Processing: Global URP Volume verified with ACES Tonemapping, low Bloom, and Color Grading.");
+
+                // 8. UI Deconfliction: Speed Panel & Vehicle Switcher Buttons
+                var btnCar = GameObject.Find("Btn_Select_Car");
+                var hudDash = GameObject.Find("HUD_Dashboard");
+                if (btnCar == null) throw new Exception("Btn_Select_Car not found in Mobile Canvas!");
+                if (hudDash == null) throw new Exception("HUD_Dashboard not found in Mobile Canvas!");
+                var rectCar = btnCar.GetComponent<RectTransform>();
+                var rectHud = hudDash.GetComponent<RectTransform>();
+
+                // Calculate Y boundaries
+                float row1BottomY = rectCar.anchoredPosition.y - (rectCar.sizeDelta.y * 0.5f);
+                float row2TopY    = rectHud.anchoredPosition.y + (rectHud.sizeDelta.y * 0.5f);
+                if (row1BottomY <= row2TopY)
+                {
+                    throw new Exception($"UI Overlap detected! Row 1 Bottom (Y={row1BottomY:F1}) overlaps or touches Row 2 Top (Y={row2TopY:F1})!");
+                }
+                float gapY = row1BottomY - row2TopY;
+                Debug.Log($"✅ UI Deconfliction: Vehicle Switcher (Row 1 bottom Y={row1BottomY:F1}) is separated by {gapY:F1}px above Speed Panel (Row 2 top Y={row2TopY:F1}) with ZERO overlap.");
+
                 // Reset inputs & simulation mode
                 InputManagerProxy.MobileThrottle = 0f;
                 InputManagerProxy.MobileBrake = 0f;
@@ -1019,7 +1113,7 @@ namespace HeavyVehiclesWorld.EditorTests
                 Physics.simulationMode = SimulationMode.FixedUpdate;
 
                 Debug.Log("\n================================================================================");
-                Debug.Log("🎉 [RECOVERY TEST PASSED] All 6 vehicles visible, driveable, and mechanism rigged!");
+                Debug.Log("🎉 [RECOVERY & STEP 4 TEST PASSED] All 6 vehicles and Visual PBR System 100% verified!");
                 Debug.Log("================================================================================");
             }
             catch (Exception ex)

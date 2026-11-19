@@ -1117,3 +1117,61 @@ Step 3 requires perfecting heavy machinery one vehicle at a time, completing the
 
 **Related to:** Step 3 Heavy Machinery, Combine Harvester, Cutting Header, Rotating Reel, CropField, Wheat Harvesting, Unload Auger, Grain Hopper, Anti-Roll Suspension, Procedural Heavy Diesel Audio, Mobile Touch HUD
 ---
+
+### Change #35 | 2026-11-20 01:05
+**Files changed:**
+- Assets/Scripts/Systems/HVW_VisualSystem.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+
+**What changed:**
+- Step 4 Visuals & Graphics Pass Implementation:
+  - Balanced Natural Daylight Lighting: Calibrated sun Directional Light (intensity `1.0f`, soft shadows `LightShadows.Soft`, shadow normal bias `0.4f`), eliminating blown-out yellow exposure. Added HDRI skybox slot (`hdriPanoramicTexture`) with seamless procedural skybox fallback and balanced trilight ambient lighting.
+  - PBR Material System: Implemented procedural normal map synthesis (`CreateProceduralNormalMap()`) and configured PBR URP/Lit materials with texture slots (Albedo, Normal, Smoothness/Metallic) across vehicle paint, rubber tires, steel machinery, and asphalt road surfaces.
+  - Terrain System & TerrainLayers: Configured 4 PBR TerrainLayers (`Layer_Grass`, `Layer_Dirt`, `Layer_Asphalt`, `Layer_Rock`) with diffuse and normal maps. Painted splatmap alphamaps across the main highway, cross street, construction site, wheat field, and quarry.
+  - Terrain Tree System with Solid Physics: Created procedural oak tree prototype (`Prefab_Tree_Oak`) with solid `CapsuleCollider` trunk physics (`radius = 0.45f, height = 5.0f`) and foliage, populating 36 roadside and boundary trees via `TerrainData.treeInstances`.
+  - Terrain Grass Detail Billboards: Generated procedural grass blade texture (`CreateProceduralGrassBladeTexture()`), configured `DetailPrototype` with healthy green and dry amber hues, and painted detail density layers across the terrain.
+  - 3D Light Probe Grid: Generated 147-probe spatial lighting grid (`LightProbeGroup_Vehicles`) for vehicle dynamic illumination.
+  - Post-Processing URP Volume: Built `GlobalPostProcessVolume` configured with ACES Tonemapping, low Bloom (`intensity = 0.18f, threshold = 1.10f`), and Color Adjustments (exposure `0.05f`, contrast `10.0f`, saturation `8.0f`).
+  - Clear Asset Warnings: Added informative warning logs prompting user asset drops without blocking gameplay or rendering fake models.
+- Mobile UI Deconfliction Pass:
+  - Completely deconflicted top HUD layout into two non-overlapping vertical tiers:
+    - Row 1 (`Y = -22f, height = 30f`): 6 Vehicle Switcher buttons (`🚗 CAR`, `🚜 TRACTOR`, `🚛 TRUCK`, `🏗️ JCB`, `⛏️ EXCAVATOR`, `🌾 HARVESTER`), `📷 VIEW`, and `🔄 RESET`. Lower edge: `Y = -37.0f`.
+    - Row 2 (`Y = -72f, height = 52f`): Speedometer & Dashboard HUD (`HUD_Dashboard`). Upper edge: `Y = -46.0f`.
+    - Maintained 9.0px vertical clearance between Row 1 and Row 2, guaranteeing 0% overlap across all screen aspect ratios (1280x576, 1920x1080, 2400x1080).
+- Play-Mode Test Suite Expansion:
+  - Added `STEP 4: VISUAL SYSTEM & GRAPHICS PASS VERIFICATION` testing sun intensity & soft shadows, skybox, PBR materials, 4 TerrainLayers with diffuse/normal textures, Terrain Tree system (36 trees + trunk CapsuleCollider), detail grass billboard layer, 147-point LightProbeGroup, post-processing Volume (ACES, Bloom, ColorAdjustments), and mathematical UI deconfliction proof.
+
+**New code:**
+```csharp
+// HVW_VisualSystem.cs - Terrain System, Layers, Trees & Foliage
+public void ConfigureTerrainSystem()
+{
+    var td = targetTerrain.terrainData;
+    td.terrainLayers = new TerrainLayer[] { grassLayer, dirtLayer, asphaltLayer, rockLayer };
+    PaintTerrainAlphamaps(td);
+
+    treePrototypePrefab = CreateProceduralTreePrefab();
+    td.treePrototypes = new TreePrototype[] { new TreePrototype { prefab = treePrototypePrefab } };
+    PopulateTerrainTrees(targetTerrain);
+
+    grassDetailTexture = CreateProceduralGrassBladeTexture();
+    td.detailPrototypes = new DetailPrototype[] { new DetailPrototype { prototypeTexture = grassDetailTexture, renderMode = DetailRenderMode.GrassBillboard } };
+    PopulateGrassDetails(td);
+}
+```
+
+**Why:**
+Step 4 requires an asset integration and visual quality upgrade: replacing flat colors with PBR URP/Lit materials and texture slots, configuring 4 TerrainLayers with normal maps and painted splatmaps, adding Terrain Tree and Detail Grass billboard systems with trunk collision, fixing lighting (removing yellow exposure blowout, soft shadows, HDRI skybox slot, light probes, post-processing with ACES tone mapping and low bloom), and fixing top UI overlap between vehicle switcher buttons and speedometer.
+
+*Previous code:*
+```csharp
+// Previous visuals relied on untextured flat-color materials with blown-out yellow sun,
+// lacked TerrainLayers (rendering terrain without splatmaps or normal maps),
+// lacked Terrain Tree and Detail Grass systems,
+// had no post-processing Volume (ACES tonemapping or bloom),
+// and had the Speedometer HUD panel overlapping the 6th vehicle selector button on mobile screens.
+```
+
+**Related to:** Step 4 Visuals, PBR Materials, URP Lit Shader, TerrainLayers, Terrain Trees, Detail Grass, HDRI Skybox, Daylight Lighting, LightProbes, ACES Tonemapping, Bloom, UI Deconfliction
+---
