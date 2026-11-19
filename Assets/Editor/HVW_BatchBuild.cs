@@ -79,14 +79,29 @@ public static class HVW_BatchBuild
             if (Directory.Exists(extJdk)) EditorPrefs.SetString("JdkPath", extJdk);
         }
 
-        // 2. Configure Android Player Settings for Production
+        // 2. Configure Android Player Settings for Production & Auto-Increment Build
+        int nextBuildNumber = HeavyVehiclesWorld.Systems.HVW_BuildInfo.BuildNumber + 1;
+        string buildDateStr = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+        string versionStr = $"v1.36-b{nextBuildNumber}";
+        string resPath = Path.Combine(Application.dataPath, "Resources", "hvw_build_info.json");
+        var bData = new HeavyVehiclesWorld.Systems.HVW_BuildInfo.BuildData
+        {
+            buildNumber = nextBuildNumber,
+            buildDate = buildDateStr,
+            versionString = versionStr
+        };
+        Directory.CreateDirectory(Path.GetDirectoryName(resPath));
+        File.WriteAllText(resPath, JsonUtility.ToJson(bData, true));
+        AssetDatabase.Refresh();
+
         PlayerSettings.companyName = "Shivraj Deshmukh";
         PlayerSettings.productName = "HeavyVehiclesWorld";
         PlayerSettings.applicationIdentifier = "com.heavyvehicles.world";
-        PlayerSettings.bundleVersion = "1.0.0";
-        PlayerSettings.Android.bundleVersionCode = 1;
+        PlayerSettings.bundleVersion = $"1.36.{nextBuildNumber}";
+        PlayerSettings.Android.bundleVersionCode = nextBuildNumber;
         PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26; // Android 8.0 Oreo (modern standard)
         PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel34; // Android 14
+        Debug.Log($"[HVW] Prepared Build Stamp: BUILD #{nextBuildNumber} | {buildDateStr} | {versionStr} (bundleVersionCode: {nextBuildNumber})");
 
         // IL2CPP & ARM64 Architecture
         PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);

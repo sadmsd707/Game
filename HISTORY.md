@@ -1316,3 +1316,67 @@ User requested updating README.md to document the full Version History starting 
 
 **Related to:** Documentation, README.md, Version History, Changelog, GitHub Release
 ---
+
+
+### Change #39 | 2026-11-20 01:50
+**Files changed:**
+- Assets/Resources/hvw_build_info.json (NEW)
+- Assets/Scripts/Systems/HVW_BuildInfo.cs (NEW)
+- Assets/Scripts/Systems/HVW_DiagnosticsOverlay.cs (NEW)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Editor/HVW_BatchBuild.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+
+**What changed:**
+- Phase 0 Safety Net Architecture:
+  - Created `Assets/Resources/hvw_build_info.json` and `HVW_BuildInfo.cs` providing compile-time and dynamic runtime build stamping (`BUILD #<n> | <date time> | <version>`), ensuring full build transparency and version tracking.
+  - Implemented `HVW_DiagnosticsOverlay.cs`: a real-time diagnostics HUD overlay operating at 4 Hz (unscaled timer) compatible with development and release Android APKs. Features 7 comprehensive panels:
+    1. System, build stamp, device model, screen resolution, active URP asset name, quality level, render scale.
+    2. Active vehicle name, type, and live Rigidbody state (speed km/h, linear velocity, isKinematic, IsSleeping, mass, drag, constraints).
+    3. Controller inputs after all processing (Throttle, Brake, Steer, Handbrake) and specialized vehicle mechanism states.
+    4. WheelCollider diagnostics for every wheel (isGrounded, motorTorque, brakeTorque, rpm, steerAngle).
+    5. EventSystem input module inspection and real-time touch pointer state tracking (Gas, Brake, Steer Left, Steer Right).
+    6. Rendering health monitor counting renderers with null, unsupported, or error shaders, terrain shader validation, and fault listings.
+    7. Thread-safe log ring buffer capturing the last 8 runtime errors/exceptions.
+  - Updated `HVW_WorldInitializer.cs`:
+    - Added `Txt_BuildStamp` below the speedometer dashboard displaying `HVW_BuildInfo.FullStamp`.
+    - Added top-bar `Btn_ToggleDBG` ("🔧 DBG") toggling the diagnostics overlay.
+    - Added pointer-down, pointer-up, and pointer-exit event tracking to touch controls to monitor touch delivery.
+    - Exposed `ActiveVehicle` property for external inspection.
+  - Updated `HVW_BatchBuild.cs`:
+    - Automated build number incrementation in `hvw_build_info.json` prior to compiling.
+    - Synchronized `PlayerSettings.Android.bundleVersionCode = nextBuildNumber` and `PlayerSettings.bundleVersion = $"1.36.{nextBuildNumber}"` so each build increment is guaranteed unique on Android.
+  - Updated `HVW_PlayModeRecoveryTest.cs`:
+    - Implemented Test 8 verifying build stamp existence, DBG button toggle, 7-section diagnostics population, live error log capture, and pointer event tracking.
+
+**New code:**
+```csharp
+// HVW_DiagnosticsOverlay.cs
+public class HVW_DiagnosticsOverlay : MonoBehaviour
+{
+    private const float REFRESH_INTERVAL = 0.25f; // 4 times per second (4 Hz)
+    public void UpdateDiagnosticsText()
+    {
+        // 1. System, Build & Pipeline
+        // 2. Active Vehicle & Rigidbody
+        // 3. Inputs & Mechanism States
+        // 4. Wheel Colliders
+        // 5. EventSystem & Touch State
+        // 6. Rendering Health
+        // 7. Last 8 Error / Exception Logs
+    }
+}
+```
+
+**Why:**
+Golden Rule 6 and Phase 0 Safety Net requirement: Release APK builds on device previously lacked real-time diagnostic visibility, making it difficult to pinpoint whether physics, input routing, EventSystems, or shaders failed on hardware. A persistent build stamp on HUD and an on-demand release-capable diagnostic overlay are required before proceeding to vehicle physics and rendering fixes.
+
+*Previous code:*
+```csharp
+// Previously, no runtime diagnostics overlay existed.
+// The HUD lacked a visible compile/build stamp, and bundleVersionCode remained hardcoded at 1.
+// Touch button interactions lacked pointer exit safety listeners.
+```
+
+**Related to:** Phase 0 Safety Net, Build Stamp, Diagnostics Overlay, Mobile Telemetry, EventSystem Tracking, Shader Error Detection, Log Ring Buffer
+---

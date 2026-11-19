@@ -1251,6 +1251,78 @@ namespace HeavyVehiclesWorld.EditorTests
                     throw new Exception("Settings modal panel failed to close on Toggle!");
                 Debug.Log("✅ Settings Menu: Modal panel toggled CLOSED.");
 
+                // ── [TEST 8: Phase 0 Safety Net: Build Stamp & Diagnostics Overlay] ───
+                Debug.Log("\n--- [TEST 8: Phase 0 Safety Net: Build Stamp & Diagnostics Overlay] ---");
+                var hudPanel = canvasGo.transform.Find("HUD_Dashboard");
+                if (hudPanel == null) throw new Exception("HUD_Dashboard not found under canvas!");
+
+                var stampTxt = hudPanel.Find("Txt_BuildStamp")?.GetComponent<UnityEngine.UI.Text>();
+                if (stampTxt == null) throw new Exception("Txt_BuildStamp Text component not found on HUD_Dashboard!");
+                if (!stampTxt.text.Contains("BUILD #"))
+                    throw new Exception($"Txt_BuildStamp text invalid: '{stampTxt.text}'");
+                Debug.Log($"✅ Build Stamp verified on HUD: '{stampTxt.text}'");
+
+                var dbgBtn = canvasGo.transform.Find("Btn_ToggleDBG");
+                if (dbgBtn == null) throw new Exception("Btn_ToggleDBG GameObject not found on canvas!");
+                Debug.Log("✅ Diagnostics Toggle Button (Btn_ToggleDBG) present on HUD top bar.");
+
+                var overlay = HVW_DiagnosticsOverlay.Instance;
+                if (overlay == null) throw new Exception("HVW_DiagnosticsOverlay instance is NULL!");
+
+                var diagPanel = canvasGo.transform.Find("Panel_DiagnosticsOverlay")?.gameObject;
+                if (diagPanel == null) throw new Exception("Panel_DiagnosticsOverlay GameObject not found on canvas!");
+                if (diagPanel.activeSelf) throw new Exception("Diagnostics panel must be closed (hidden) by default!");
+
+                // Toggle open
+                overlay.Toggle();
+                if (!diagPanel.activeSelf) throw new Exception("Diagnostics panel failed to open after overlay.Toggle()!");
+                Debug.Log("✅ Diagnostics Overlay: Toggled OPEN.");
+
+                // Verify text content
+                var diagContentTxt = diagPanel.transform.Find("ScrollView/Content/Txt_Content")?.GetComponent<UnityEngine.UI.Text>();
+                if (diagContentTxt == null) throw new Exception("Txt_Content Text component not found inside diagnostics scroll view!");
+
+                string content = diagContentTxt.text;
+                if (!content.Contains("[1. SYSTEM, BUILD & PIPELINE]"))
+                    throw new Exception("Diagnostics missing Section 1 (SYSTEM, BUILD & PIPELINE)!");
+                if (!content.Contains("[2. ACTIVE VEHICLE & RIGIDBODY]"))
+                    throw new Exception("Diagnostics missing Section 2 (ACTIVE VEHICLE & RIGIDBODY)!");
+                if (!content.Contains("[3. INPUTS & MECHANISM STATES]"))
+                    throw new Exception("Diagnostics missing Section 3 (INPUTS & MECHANISM STATES)!");
+                if (!content.Contains("[4. WHEEL COLLIDERS]"))
+                    throw new Exception("Diagnostics missing Section 4 (WHEEL COLLIDERS)!");
+                if (!content.Contains("[5. EVENTSYSTEM & TOUCH STATE]"))
+                    throw new Exception("Diagnostics missing Section 5 (EVENTSYSTEM & TOUCH STATE)!");
+                if (!content.Contains("[6. RENDERING HEALTH]"))
+                    throw new Exception("Diagnostics missing Section 6 (RENDERING HEALTH)!");
+                if (!content.Contains("[7. LAST 8 ERROR / EXCEPTION LOGS]"))
+                    throw new Exception("Diagnostics missing Section 7 (LAST 8 ERROR / EXCEPTION LOGS)!");
+                Debug.Log("✅ Diagnostics Overlay: All 7 required sections populated and verified.");
+
+                // Test Log Ring Buffer
+                string testErrorMsg = "[TestErrorLog] Diagnostics verification error capture";
+                Debug.LogError(testErrorMsg);
+                overlay.UpdateDiagnosticsText();
+                if (!diagContentTxt.text.Contains(testErrorMsg))
+                    throw new Exception("Diagnostics ring buffer failed to capture and display test error log!");
+                Debug.Log("✅ Diagnostics Overlay: Live error log ring buffer capture verified.");
+
+                // Test Pointer Tracking
+                HVW_DiagnosticsOverlay.IsGasPointerDown = true;
+                overlay.UpdateDiagnosticsText();
+                if (!diagContentTxt.text.Contains("GasHeld=True"))
+                    throw new Exception("Diagnostics failed to reflect GasHeld=True!");
+                HVW_DiagnosticsOverlay.IsGasPointerDown = false;
+                overlay.UpdateDiagnosticsText();
+                if (!diagContentTxt.text.Contains("GasHeld=False"))
+                    throw new Exception("Diagnostics failed to reflect GasHeld=False!");
+                Debug.Log("✅ Diagnostics Overlay: Real-time touch pointer state tracking verified.");
+
+                // Toggle close
+                overlay.Toggle();
+                if (diagPanel.activeSelf) throw new Exception("Diagnostics panel failed to close on second overlay.Toggle()!");
+                Debug.Log("✅ Diagnostics Overlay: Toggled CLOSED.");
+
                 // Reset inputs & simulation mode
                 InputManagerProxy.MobileThrottle = 0f;
                 InputManagerProxy.MobileBrake = 0f;

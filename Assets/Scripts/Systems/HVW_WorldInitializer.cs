@@ -20,6 +20,8 @@ namespace HeavyVehiclesWorld.Systems
 
         private List<VehicleController> _allVehicles = new List<VehicleController>();
         private VehicleController _activeVehicle;
+        public VehicleController ActiveVehicle => _activeVehicle;
+        private HVW_DiagnosticsOverlay _diagOverlay;
         private HVW_FollowCamera _followCamera;
         private Canvas _mobileCanvas;
         private Text _speedometerText;
@@ -51,6 +53,11 @@ namespace HeavyVehiclesWorld.Systems
                 return;
             }
             Instance = this;
+
+            // Ensure Diagnostics Overlay is active
+            _diagOverlay = GetComponent<HVW_DiagnosticsOverlay>();
+            if (_diagOverlay == null)
+                _diagOverlay = gameObject.AddComponent<HVW_DiagnosticsOverlay>();
 
             // Initialize Master Visual & PBR System first
             if (HVW_VisualSystem.Instance == null)
@@ -922,29 +929,29 @@ namespace HeavyVehiclesWorld.Systems
             CreateTouchButton(canvasGo, "Btn_SteerLeft", "◀ STEER",
                 new Vector2(0f, 0f), new Vector2(140f, 130f), new Vector2(160f, 150f),
                 new Color(0.15f, 0.18f, 0.22f, 0.85f),
-                () => { _steerLeftHeld = true; },
-                () => { _steerLeftHeld = false; });
+                () => { _steerLeftHeld = true; HVW_DiagnosticsOverlay.IsSteerLeftPointerDown = true; },
+                () => { _steerLeftHeld = false; HVW_DiagnosticsOverlay.IsSteerLeftPointerDown = false; });
 
             CreateTouchButton(canvasGo, "Btn_SteerRight", "STEER ▶",
                 new Vector2(0f, 0f), new Vector2(320f, 130f), new Vector2(160f, 150f),
                 new Color(0.15f, 0.18f, 0.22f, 0.85f),
-                () => { _steerRightHeld = true; },
-                () => { _steerRightHeld = false; });
+                () => { _steerRightHeld = true; HVW_DiagnosticsOverlay.IsSteerRightPointerDown = true; },
+                () => { _steerRightHeld = false; HVW_DiagnosticsOverlay.IsSteerRightPointerDown = false; });
 
             // ── Right: Pedals & Handbrake ─────────────────────────────────────
             // Gas Pedal (Large Green)
             CreateTouchButton(canvasGo, "Btn_Gas", "GAS / ACCEL\n▲",
                 new Vector2(1f, 0f), new Vector2(-130f, 150f), new Vector2(140f, 190f),
                 new Color(0.12f, 0.65f, 0.25f, 0.90f),
-                () => { _accelHeld = true; },
-                () => { _accelHeld = false; });
+                () => { _accelHeld = true; HVW_DiagnosticsOverlay.IsGasPointerDown = true; },
+                () => { _accelHeld = false; HVW_DiagnosticsOverlay.IsGasPointerDown = false; });
 
             // Brake / Reverse Pedal (Red)
             CreateTouchButton(canvasGo, "Btn_Brake", "BRAKE / REV\n▼",
                 new Vector2(1f, 0f), new Vector2(-280f, 135f), new Vector2(130f, 160f),
                 new Color(0.78f, 0.18f, 0.18f, 0.90f),
-                () => { _brakeHeld = true; },
-                () => { _brakeHeld = false; });
+                () => { _brakeHeld = true; HVW_DiagnosticsOverlay.IsBrakePointerDown = true; },
+                () => { _brakeHeld = false; HVW_DiagnosticsOverlay.IsBrakePointerDown = false; });
 
             // Handbrake (Yellow/Orange)
             CreateTouchButton(canvasGo, "Btn_Handbrake", "STOP / HB\n🛑",
@@ -988,6 +995,12 @@ namespace HeavyVehiclesWorld.Systems
                     () => { SwitchToVehicleIndex(idx); });
             }
 
+            // Diagnostics Button (Top-Right, Row 1, left of Settings)
+            CreateClickButton(canvasGo, "Btn_ToggleDBG", "🔧 DBG",
+                new Vector2(1f, 1f), new Vector2(-286f, -22f), new Vector2(56f, 30f),
+                new Color(0.35f, 0.15f, 0.55f, 0.90f),
+                () => { if (_diagOverlay != null) _diagOverlay.Toggle(); });
+
             // Settings Button (Top-Right, Row 1)
             CreateClickButton(canvasGo, "Btn_Settings", "⚙️ SETTINGS",
                 new Vector2(1f, 1f), new Vector2(-212f, -22f), new Vector2(76f, 30f),
@@ -1006,20 +1019,27 @@ namespace HeavyVehiclesWorld.Systems
                 new Color(0.35f, 0.35f, 0.40f, 0.90f),
                 () => { ResetActiveVehicle(); });
 
-            // ── Speedometer & Dashboard HUD (Row 2: Y = -72f, strictly below Row 1) ───
+            // ── Speedometer & Dashboard HUD (Row 2: Y = -76f, strictly below Row 1) ───
             var hudPanel = new GameObject("HUD_Dashboard");
             hudPanel.transform.SetParent(canvasGo.transform, false);
             var hudRect = hudPanel.AddComponent<RectTransform>();
             hudRect.anchorMin = new Vector2(0.5f, 1f);
             hudRect.anchorMax = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0f, -72f);
-            hudRect.sizeDelta = new Vector2(280f, 52f);
+            hudRect.anchoredPosition = new Vector2(0f, -76f);
+            hudRect.sizeDelta = new Vector2(300f, 68f);
             var hudImg = hudPanel.AddComponent<Image>();
             hudImg.color = new Color(0.08f, 0.08f, 0.10f, 0.85f);
 
-            _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 22, TextAnchor.MiddleCenter, new Vector2(0f, 8f), new Vector2(260f, 26f), Color.white);
-            _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 13, TextAnchor.MiddleCenter, new Vector2(-70f, -14f), new Vector2(110f, 20f), new Color(0.4f, 0.85f, 1f));
-            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 13, TextAnchor.MiddleCenter, new Vector2(70f, -14f), new Vector2(120f, 20f), new Color(1f, 0.85f, 0.3f));
+            _speedometerText = CreateText(hudPanel, "Txt_Speed", "0 KM/H", 20, TextAnchor.MiddleCenter, new Vector2(0f, 16f), new Vector2(280f, 24f), Color.white);
+            _gearText        = CreateText(hudPanel, "Txt_Gear", "GEAR: D1", 12, TextAnchor.MiddleCenter, new Vector2(-75f, -6f), new Vector2(110f, 18f), new Color(0.4f, 0.85f, 1f));
+            _vehicleNameText = CreateText(hudPanel, "Txt_VehName", "Car (SUV)", 12, TextAnchor.MiddleCenter, new Vector2(75f, -6f), new Vector2(130f, 18f), new Color(1f, 0.85f, 0.3f));
+            CreateText(hudPanel, "Txt_BuildStamp", HVW_BuildInfo.FullStamp, 10, TextAnchor.MiddleCenter, new Vector2(0f, -24f), new Vector2(290f, 16f), new Color(0.75f, 0.75f, 0.75f));
+
+            // Initialize Diagnostics Overlay UI
+            if (_diagOverlay != null)
+            {
+                _diagOverlay.InitializeUI(canvasGo);
+            }
 
             // Build Settings Modal Dialog
             BuildSettingsModal(canvasGo);
@@ -1206,6 +1226,10 @@ namespace HeavyVehiclesWorld.Systems
             var entryUp = new EventTrigger.Entry { eventID = EventTriggerType.PointerUp };
             entryUp.callback.AddListener((data) => { onUp(); img.color = col; });
             trigger.triggers.Add(entryUp);
+
+            var entryExit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+            entryExit.callback.AddListener((data) => { onUp(); img.color = col; });
+            trigger.triggers.Add(entryExit);
         }
 
         private GameObject CreateClickButton(GameObject parent, string name, string label, Vector2 anchor, Vector2 pos, Vector2 size, Color col, System.Action onClick)
