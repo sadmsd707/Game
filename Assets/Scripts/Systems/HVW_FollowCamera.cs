@@ -104,8 +104,8 @@ namespace HeavyVehiclesWorld.Systems
                         }
                         else if (vc.vehicleType == VehicleType.Harvester)
                         {
-                            followDist = 8.5f;
-                            followHeight = 3.4f;
+                            followDist = 9.5f;
+                            followHeight = 3.8f;
                         }
                         else if (vc.vehicleType == VehicleType.Excavator || vc.vehicleType == VehicleType.JCB)
                         {

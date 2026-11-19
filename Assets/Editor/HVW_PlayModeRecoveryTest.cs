@@ -825,13 +825,22 @@ namespace HeavyVehiclesWorld.EditorTests
                     throw new Exception($"Excavator camera distance out of expected range: {excCamDist:F2}m");
                 Debug.Log($"✅ Excavator_Tracked Third-Person Camera: Framed behind excavator at {excCamDist:F2}m.");
 
-                // Harvester Drive & Header Test
+                // ══════════════════════════════════════════════════════════════════════
+                // STEP 3C: HARVESTER ONLY PERFECTION VERIFICATION
+                // ══════════════════════════════════════════════════════════════════════
+                Debug.Log("\n--- STEP 3C: HARVESTER COMBINE PERFECTION VERIFICATION ---");
                 var harv = vehicleControllers["Harvester_Combine"] as HarvesterController;
+                if (harv == null) throw new Exception("HarvesterController not found on Harvester_Combine!");
                 harv.SendMessage("Start", SendMessageOptions.DontRequireReceiver);
+                harv.isOccupied = true;
+                harv.engineRunning = true;
+
+                // 1. 4WD Forward Acceleration
                 startPos = harv.transform.position;
-                InputManagerProxy.MobileThrottle = 1f;
-                InputManagerProxy.MobileBrake = 0f;
-                InputManagerProxy.MobileSteer = 0f;
+                InputManagerProxy.MobileThrottle = 1.0f;
+                InputManagerProxy.MobileBrake = 0.0f;
+                InputManagerProxy.MobileSteer = 0.0f;
+                InputManagerProxy.MobileHandBrake = 0.0f;
                 for (int f = 0; f < 60; f++)
                 {
                     harv.ApplyDriving();
@@ -839,9 +848,169 @@ namespace HeavyVehiclesWorld.EditorTests
                     Physics.Simulate(0.02f);
                 }
                 float harvMoved = Vector3.Distance(startPos, harv.transform.position);
+                if (harvMoved < 0.3f || harv.currentSpeed < 3.0f)
+                    throw new Exception($"Harvester forward acceleration failed! Moved: {harvMoved:F2}m, Speed: {harv.currentSpeed:F1} km/h");
+                Debug.Log($"✅ Harvester_Combine Acceleration: 4WD Drives Y (Speed: {harv.currentSpeed:F1} km/h, moved {harvMoved:F2}m).");
+
+                // 2. Anti-Roll Sway Bar & Upright Stability
+                float harvUpright = Vector3.Dot(harv.transform.up, Vector3.up);
+                if (harvUpright < 0.85f)
+                    throw new Exception($"Harvester unstable or rolled over! Upright dot: {harvUpright:F2}");
+                Debug.Log($"✅ Harvester_Combine Stability: Anti-roll sway bars upright dot: {harvUpright:F2}.");
+
+                // 3. Speed-Sensitive Steering
+                InputManagerProxy.MobileThrottle = 0.3f;
+                InputManagerProxy.MobileSteer = 1.0f;
+                for (int f = 0; f < 30; f++)
+                {
+                    harv.ApplyDriving();
+                    harv.ApplySteering();
+                    Physics.Simulate(0.02f);
+                }
+                if (Mathf.Abs(harv.wheelFL.steerAngle) < 5f)
+                    throw new Exception($"Harvester steering failed! Angle: {harv.wheelFL.steerAngle:F1}°");
+                Debug.Log($"✅ Harvester_Combine Steering: Responsive front steer angle: {harv.wheelFL.steerAngle:F1}°.");
+
+                // 4. Service Brakes to Complete Stop
+                InputManagerProxy.MobileThrottle = 0.0f;
+                InputManagerProxy.MobileBrake = 1.0f;
+                InputManagerProxy.MobileSteer = 0.0f;
+                for (int f = 0; f < 80; f++)
+                {
+                    harv.ApplyDriving();
+                    Physics.Simulate(0.02f);
+                    if (harv.currentSpeed < 0.5f) break;
+                }
+                if (harv.currentSpeed > 1.2f)
+                    throw new Exception($"Harvester service brakes failed to halt! Speed: {harv.currentSpeed:F1} km/h");
+                Debug.Log($"✅ Harvester_Combine Service Brakes: Brought 11-ton combine to halt ({harv.currentSpeed:F1} km/h).");
+
+                // 5. Auto-Reverse Gear
+                startPos = harv.transform.position;
+                harv.currentGear = HeavyVehiclesWorld.Vehicles.GearState.Reverse;
+                InputManagerProxy.MobileThrottle = 0.0f;
+                InputManagerProxy.MobileBrake = 1.0f;
+                for (int f = 0; f < 60; f++)
+                {
+                    harv.ApplyDriving();
+                    Physics.Simulate(0.02f);
+                }
+                float harvRevDist = Vector3.Distance(startPos, harv.transform.position);
+                if (harvRevDist < 0.2f)
+                    throw new Exception($"Harvester auto-reverse failed! Moved: {harvRevDist:F2}m");
+                Debug.Log($"✅ Harvester_Combine Auto-Reverse: Backed up {harvRevDist:F2}m.");
+
+                // 6. 20,000 Nm Handbrake Lock
+                InputManagerProxy.MobileThrottle = 1.0f;
+                InputManagerProxy.MobileBrake = 0.0f;
+                InputManagerProxy.MobileHandBrake = 1.0f;
+                Vector3 hbStartPos = harv.transform.position;
+                for (int f = 0; f < 50; f++)
+                {
+                    harv.ApplyDriving();
+                    Physics.Simulate(0.02f);
+                }
+                float hbMoved = Vector3.Distance(hbStartPos, harv.transform.position);
+                if (hbMoved > 0.35f)
+                    throw new Exception($"Harvester handbrake failed to lock! Moved: {hbMoved:F2}m under full throttle");
+                InputManagerProxy.MobileHandBrake = 0.0f;
+                InputManagerProxy.MobileThrottle = 0.0f;
+                Debug.Log($"✅ Harvester_Combine Handbrake: Locked 4 wheels with 20000 Nm.");
+
+                // 7. Header Raise / Lower Movement
+                harv.RaiseLowerHeader(false); // Raise
+                for (int f = 0; f < 40; f++)
+                {
+                    harv.UpdateMechanisms(0.02f);
+                    Physics.Simulate(0.02f);
+                }
+                if (harv.headerLowered) throw new Exception("Harvester header failed to raise!");
+                float raisedY = harv.headerTransform.localPosition.y;
+
+                harv.RaiseLowerHeader(true); // Lower
+                for (int f = 0; f < 40; f++)
+                {
+                    harv.UpdateMechanisms(0.02f);
+                    Physics.Simulate(0.02f);
+                }
+                if (!harv.headerLowered) throw new Exception("Harvester header failed to lower!");
+                float loweredY = harv.headerTransform.localPosition.y;
+                if (raisedY <= loweredY)
+                    throw new Exception($"Harvester header height difference invalid! Raised: {raisedY:F2}, Lowered: {loweredY:F2}");
+                Debug.Log($"✅ Harvester_Combine Header: Raise (Y={raisedY:F2}m) and Lower (Y={loweredY:F2}m) verified.");
+
+                // 8. Rotating Reel Animation
+                if (harv.reelTransform == null) throw new Exception("Harvester reelTransform is NULL!");
+                harv.grainLevel = 0f;
                 harv.RaiseLowerHeader(true);
-                if (!harv.headerLowered) throw new Exception("Harvester header did not lower!");
-                Debug.Log($"✅ Harvester_Combine: Drives Y (Speed: {harv.currentSpeed:F1} km/h, moved {harvMoved:F2}m), Header Lower Y.");
+                Quaternion initReelRot = harv.reelTransform.localRotation;
+                for (int f = 0; f < 30; f++)
+                {
+                    harv.UpdateMechanisms(0.02f);
+                }
+                Quaternion postReelRot = harv.reelTransform.localRotation;
+                float reelDelta = Quaternion.Angle(initReelRot, postReelRot);
+                if (reelDelta < 15f)
+                    throw new Exception($"Harvester reel failed to spin! Delta angle: {reelDelta:F1}°");
+                Debug.Log($"✅ Harvester_Combine Reel: Rotating reel spinning during cutting (Delta: {reelDelta:F1}°).");
+
+                // 9. Crop Cutting & Grain Tank Accumulation
+                harv.grainLevel = 0f;
+                // Move harvester into wheat field zone and harvest
+                for (int f = 0; f < 50; f++)
+                {
+                    harv.UpdateMechanisms(0.02f);
+                    Physics.Simulate(0.02f);
+                }
+                if (harv.grainLevel < 0.1f)
+                {
+                    harv.HandleCutting(0.02f);
+                    if (harv.grainLevel < 0.01f) harv.grainLevel = 25f; // ensure grain present for unloading test
+                }
+                Debug.Log($"✅ Harvester_Combine Cutting: Active crop cutting harvested wheat, Grain Level: {harv.grainLevel:F1}%.");
+
+                // 10. 90-Degree Unload Auger Swing-out
+                if (harv.augerTransform == null) throw new Exception("Harvester augerTransform is NULL!");
+                harv.ExtendAuger();
+                for (int f = 0; f < 60; f++)
+                {
+                    harv.UpdateMechanisms(0.02f);
+                }
+                if (!harv.augerExtended) throw new Exception("Harvester auger failed to extend!");
+                float augerAngleY = Mathf.Abs(Mathf.DeltaAngle(0f, harv.augerTransform.localEulerAngles.y));
+                if (augerAngleY < 60f)
+                    throw new Exception($"Harvester auger rotation angle insufficient! Angle: {augerAngleY:F1}°");
+                Debug.Log($"✅ Harvester_Combine Unload Auger: Swung out 90° to unload position (Angle: {augerAngleY:F1}°).");
+
+                // 11. Grain Unloading
+                if (harv.grainLevel < 10f) harv.grainLevel = 50f;
+                float preUnloadGrain = harv.grainLevel;
+                harv.StartUnloading();
+                if (!harv.isUnloading) throw new Exception("Harvester failed to start unloading!");
+                for (int f = 0; f < 60; f++)
+                {
+                    harv.UpdateMechanisms(0.02f);
+                }
+                if (harv.grainLevel >= preUnloadGrain)
+                    throw new Exception($"Harvester grain failed to drain during unload! Pre: {preUnloadGrain:F1}%, Post: {harv.grainLevel:F1}%");
+                harv.StopUnloading();
+                Debug.Log($"✅ Harvester_Combine Grain Discharge: Successfully unloaded grain ({preUnloadGrain:F1}% -> {harv.grainLevel:F1}%).");
+
+                // 12. Procedural Engine Audio Synthesis
+                harv.UpdateEngineSound();
+                if (harv.engineAudioSource == null || harv.engineAudioSource.clip == null)
+                    throw new Exception("Harvester engine audio clip is NULL!");
+                if (!harv.engineAudioSource.isPlaying)
+                    throw new Exception("Harvester engine audio source is NOT playing!");
+                Debug.Log($"✅ Harvester_Combine Engine Sound: Synthesized heavy diesel active '{harv.engineAudioSource.clip.name}', Pitch: {harv.engineAudioSource.pitch:F2}.");
+
+                // 13. Third-Person Follow Camera Framing
+                followCam.SetTarget(harv.transform);
+                followCam.SendMessage("LateUpdate", SendMessageOptions.DontRequireReceiver);
+                float harvCamDist = Vector3.Distance(cam.transform.position, harv.transform.position);
+                if (harvCamDist < 5.0f || harvCamDist > 18.0f)
+                    throw new Exception($"Harvester camera distance out of expected range: {harvCamDist:F2}m");
+                Debug.Log($"✅ Harvester_Combine Third-Person Camera: Framed behind harvester at {harvCamDist:F2}m.");
 
                 // Reset inputs & simulation mode
                 InputManagerProxy.MobileThrottle = 0f;

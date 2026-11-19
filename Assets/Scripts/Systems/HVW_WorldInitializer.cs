@@ -192,6 +192,21 @@ namespace HeavyVehiclesWorld.Systems
             farmGround.transform.localScale = new Vector3(80f, 0.05f, 80f);
             farmGround.GetComponent<Renderer>().sharedMaterial = CreateSafeMaterial("M_WheatField", new Color(0.82f, 0.68f, 0.25f));
 
+            // Crop Manager & Wheat Crop Field with cuttable stalks
+            var cropMgrGo = new GameObject("CropManager");
+            cropMgrGo.transform.SetParent(roadRoot.transform);
+            var cropMgr = cropMgrGo.AddComponent<CropManager>();
+
+            var fieldGo = new GameObject("WheatField_Crops");
+            fieldGo.transform.SetParent(roadRoot.transform);
+            fieldGo.transform.position = new Vector3(45f, 0.05f, -40f);
+            var cropField = fieldGo.AddComponent<CropField>();
+            cropField.rows = 20;
+            cropField.columns = 30;
+            cropField.rowSpacing = 2.0f;
+            cropField.columnSpacing = 2.0f;
+            cropMgr.RegisterField(cropField);
+
             // Quarry Dig Site (Grey Rock / Gravel)
             var quarryGround = GameObject.CreatePrimitive(PrimitiveType.Cube);
             quarryGround.name = "Zone_QuarryGravel";
@@ -707,16 +722,46 @@ namespace HeavyVehiclesWorld.Systems
                     headerPivot.transform.SetParent(placeholderGo.transform, false);
                     headerPivot.transform.localPosition = new Vector3(0f, 0.4f, bodySize.z * 0.48f);
                     CreateBox("Cutter_Bar", headerPivot.transform, new Vector3(0f, 0f, 0.6f), new Vector3(bodySize.x * 1.35f, 0.5f, 0.85f), new Color(0.85f, 0.25f, 0.25f));
+
+                    // Revolving Reel Assembly on cutting header
+                    var reelPivot = new GameObject("Cutter_Reel_Pivot");
+                    reelPivot.transform.SetParent(headerPivot.transform, false);
+                    reelPivot.transform.localPosition = new Vector3(0f, 0.35f, 0.6f);
+
+                    var reelAxle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    reelAxle.name = "Reel_Axle";
+                    reelAxle.transform.SetParent(reelPivot.transform, false);
+                    reelAxle.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+                    reelAxle.transform.localScale = new Vector3(0.12f, bodySize.x * 0.65f, 0.12f);
+                    DestroyImmediate(reelAxle.GetComponent<Collider>());
+                    reelAxle.GetComponent<Renderer>().sharedMaterial = steelMat;
+
+                    for (int b = 0; b < 4; b++)
+                    {
+                        float angle = b * 90f;
+                        var bar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        bar.name = $"Reel_Paddle_{b}";
+                        bar.transform.SetParent(reelPivot.transform, false);
+                        float rad = angle * Mathf.Deg2Rad;
+                        bar.transform.localPosition = new Vector3(0f, Mathf.Sin(rad) * 0.28f, Mathf.Cos(rad) * 0.28f);
+                        bar.transform.localScale = new Vector3(bodySize.x * 1.30f, 0.04f, 0.10f);
+                        DestroyImmediate(bar.GetComponent<Collider>());
+                        bar.GetComponent<Renderer>().sharedMaterial = steelMat;
+                    }
+
                     slot.cutterHeader = headerPivot.transform;
                     if (ctrl is HarvesterController hc)
                     {
                         hc.headerTransform = headerPivot.transform;
+                        hc.reelTransform = reelPivot.transform;
                     }
 
+                    // 90-Degree Swing-out Unloading Auger Pipe
                     var augerPivot = new GameObject("Auger_Pivot");
                     augerPivot.transform.SetParent(placeholderGo.transform, false);
                     augerPivot.transform.localPosition = new Vector3(-bodySize.x * 0.45f, bodySize.y * 0.88f, -0.4f);
-                    CreateBox("Auger_Pipe", augerPivot.transform, new Vector3(-1.5f, 0f, 0f), new Vector3(3.0f, 0.25f, 0.25f), steelMat);
+                    CreateBox("Auger_Pipe", augerPivot.transform, new Vector3(0f, 0f, -1.5f), new Vector3(0.25f, 0.25f, 3.0f), steelMat);
+                    CreateBox("Auger_Spout", augerPivot.transform, new Vector3(0f, -0.2f, -2.9f), new Vector3(0.22f, 0.35f, 0.22f), darkMat);
                     slot.unloadAuger = augerPivot.transform;
                     if (ctrl is HarvesterController hc2)
                     {
@@ -1115,7 +1160,18 @@ namespace HeavyVehiclesWorld.Systems
             }
 
             if (_vehicleNameText != null)
-                _vehicleNameText.text = _activeVehicle.VehicleName;
+            {
+                if (_activeVehicle is HarvesterController hc)
+                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Grain: {hc.grainLevel:F0}%";
+                else if (_activeVehicle is ExcavatorController ec)
+                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Soil: {ec.currentSoilVolume:P0}";
+                else if (_activeVehicle is JCBController jcb)
+                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Soil: {jcb.soilPayload:P0}";
+                else if (_activeVehicle is TruckController tk)
+                    _vehicleNameText.text = $"{_activeVehicle.VehicleName} | Cargo: {tk.currentPayload:F0}kg";
+                else
+                    _vehicleNameText.text = _activeVehicle.VehicleName;
+            }
         }
 
         public void SelectVehicle(VehicleController vc)
@@ -1203,7 +1259,14 @@ namespace HeavyVehiclesWorld.Systems
             }
             else if (_activeVehicle is HarvesterController hc)
             {
-                hc.RaiseLowerHeader(!hc.headerLowered);
+                if (buttonIndex == 1)
+                {
+                    hc.RaiseLowerHeader(!hc.headerLowered);
+                }
+                else
+                {
+                    hc.ToggleAuger();
+                }
                 UpdateActionUI();
             }
         }
@@ -1257,7 +1320,20 @@ namespace HeavyVehiclesWorld.Systems
                 _actionButtonGo.SetActive(true);
                 if (_actionButtonLabel != null)
                     _actionButtonLabel.text = hc.headerLowered ? "🌾 RAISE\nHEADER" : "🌾 LOWER\nHEADER";
-                if (_actionButtonGo2 != null) _actionButtonGo2.SetActive(false);
+
+                if (_actionButtonGo2 != null)
+                {
+                    _actionButtonGo2.SetActive(true);
+                    if (_actionButtonLabel2 != null)
+                    {
+                        if (!hc.augerExtended)
+                            _actionButtonLabel2.text = "🚜 EXTEND\nAUGER";
+                        else if (hc.isUnloading)
+                            _actionButtonLabel2.text = "⏹️ STOP\nUNLOAD";
+                        else
+                            _actionButtonLabel2.text = "🌾 UNLOAD\nGRAIN";
+                    }
+                }
             }
             else
             {

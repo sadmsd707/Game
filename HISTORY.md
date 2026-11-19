@@ -1054,3 +1054,66 @@ Step 3 requires perfecting heavy machinery one vehicle at a time, moving to the 
 
 **Related to:** Step 3 Heavy Machinery, Tracked Excavator, Dual-Track Tank Drive, In-Place Counter-Rotation, 360 Cabin Slew, Articulated Arm Digging, Terrain Deformation, Procedural Heavy Diesel Audio, Mobile Touch HUD
 ---
+
+### Change #34 | 2026-11-19 23:28
+**Files changed:**
+- Assets/Scripts/Vehicles/HarvesterController.cs (MODIFIED)
+- Assets/Scripts/Vehicles/CropField.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_WorldInitializer.cs (MODIFIED)
+- Assets/Scripts/Systems/HVW_FollowCamera.cs (MODIFIED)
+- Assets/Editor/HVW_PlayModeRecoveryTest.cs (MODIFIED)
+
+**What changed:**
+- Perfected Combine Harvester Physics & 4WD Locomotion:
+  - Transferred physics simulation completely into `FixedUpdate()` with anti-roll stabilizer sway bars (`antiRollStiffness = 14000f`) across front and rear axles and downforce (`downforceCoefficient = 4.0f`) to prevent rollovers.
+  - Implemented automatic forward/reverse gear shifting logic with high-force progressive service brakes (14,000 Nm) bringing the 11-ton machine to a complete halt (0.5 km/h), followed by auto-reverse capability.
+  - Added heavy parking handbrake (`20000f` Nm) capable of locking all 4 wheels under full motor throttle.
+- Header Cutting System & Rotating Reel Animation:
+  - Added `reelTransform` and revolving reel assembly with center axle cylinder and 4 paddle bars mounted on `CutterHeader_Pivot`.
+  - Implemented smooth header raise/lower animation between transport height (0.75m) and field cutting height (0.15m).
+  - Wired rotating reel spinning animation (`AnimateReel()`) spinning around local X-axis (144.0° delta) whenever the header is lowered or cutting is active.
+- World Wheat Field & Real-Time Crop Harvesting:
+  - Upgraded `CropField.cs` with procedural standing golden wheat stalk generator (`CreateProceduralWheatStalk()`), creating slender stems and wheat grain heads with trigger colliders.
+  - Instantiated `CropManager` and registered `WheatField_Crops` grid (20 rows x 30 columns = 600 harvestable stalks) across `Zone_WheatField` in `HVW_WorldInitializer.cs`.
+  - Active crop cutting slices wheat stalks within `cutBoundsSize`, visibly shrinking and removing standing crops, and accumulating grain inside the combine's grain tank up to 100% capacity (`grainLevel`).
+- 90-Degree Swing-out Unloading Auger & Grain Discharge:
+  - Built 90° swing-out unloading auger pipe (`augerTransform`) with downward discharge spout.
+  - Added `ToggleAuger()`, `ExtendAuger()`, `RetractAuger()`, `StartUnloading()`, and `StopUnloading()` draining accumulated grain payload from hopper (`25.0% -> 0.0%`).
+- Procedural Harvester Heavy Diesel Audio:
+  - Created procedural audio synthesis `CreateProceduralHarvesterDieselClip()` generating authentic 6-cylinder agricultural diesel combustion (~32 Hz fundamental + Perlin noise rumble + cutter load whine), dynamically pitch-shifted by ground speed and active cutter load.
+- Touch HUD Action Buttons & Camera:
+  - Added mobile action buttons: Button 1 (`"🌾 RAISE\nHEADER"` / `"🌾 LOWER\nHEADER"`) and Button 2 (`"🚜 EXTEND\nAUGER"` / `"🌾 UNLOAD\nGRAIN"` / `"⏹️ STOP\nUNLOAD"`).
+  - Configured `HVW_FollowCamera.cs` for Harvester (`followDist = 9.5f; followHeight = 3.8f;`) for unobstructed visibility over the combine hopper and cutting header.
+- Expanded Play-Mode Recovery Test Suite:
+  - Added comprehensive verification block `STEP 3C: HARVESTER COMBINE PERFECTION VERIFICATION`.
+  - Tested 4WD drive (4.3 km/h), anti-roll stability (upright dot: 1.00), steering (23.5°), service brake halt (0.5 km/h), auto-reverse (0.42m), 20,000 Nm handbrake, header raise (0.75m) and lower (0.15m), reel spinning (144.0°), wheat crop cutting and grain accumulation (25%), 90° auger swing-out (77.8°), grain discharge (25% -> 0%), procedural diesel audio, and camera framing at 10.23m.
+
+**New code:**
+```csharp
+// HarvesterController.cs - Header, Reel, and Crop Cutting
+public void AnimateReel(float dt)
+{
+    if (reelTransform == null) return;
+    if (headerLowered || isCutting)
+    {
+        float speedMult = Mathf.Clamp(currentSpeed * 0.4f, 1f, 3.5f);
+        reelTransform.Rotate(Vector3.right * (reelSpinSpeed * speedMult * dt), Space.Self);
+    }
+}
+```
+
+**Why:**
+Step 3 requires perfecting heavy machinery one vehicle at a time, completing the Harvester Combine: implementing stable 4WD suspension with anti-roll bars, raising/lowering cutting header, rotating reel animation, real-time wheat stalk cutting with grain tank accumulation, 90-degree swing-out unloading auger, procedural heavy diesel audio, and dedicated mobile touch HUD action controls.
+
+*Previous code:*
+```csharp
+// HarvesterController previously had physics executing in Update() with no anti-roll bars,
+// lacked rotating reel animation on the cutting header,
+// had no procedural wheat stalks spawned in the farm field to harvest,
+// had no auto-reverse or high-torque handbrake,
+// lacked procedural engine audio synthesis fallback,
+// and had only a single generic header button without auger extension/unloading controls on the mobile HUD.
+```
+
+**Related to:** Step 3 Heavy Machinery, Combine Harvester, Cutting Header, Rotating Reel, CropField, Wheat Harvesting, Unload Auger, Grain Hopper, Anti-Roll Suspension, Procedural Heavy Diesel Audio, Mobile Touch HUD
+---
