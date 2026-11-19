@@ -85,8 +85,8 @@ public static class HVW_BatchBuild
         PlayerSettings.applicationIdentifier = "com.heavyvehicles.world";
         PlayerSettings.bundleVersion = "1.0.0";
         PlayerSettings.Android.bundleVersionCode = 1;
-        PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24; // Android 7.0
-        PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel34;
+        PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26; // Android 8.0 Oreo (modern standard)
+        PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel34; // Android 14
 
         // IL2CPP & ARM64 Architecture
         PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
@@ -114,9 +114,12 @@ public static class HVW_BatchBuild
         }
 
         // Build Settings
-        EditorUserBuildSettings.buildAppBundle = false; // APK
+        EditorUserBuildSettings.buildAppBundle = false; // Release APK
         EditorUserBuildSettings.androidBuildType = AndroidBuildType.Release;
-        EditorUserBuildSettings.androidCreateSymbols = AndroidCreateSymbols.Disabled;
+
+        // Run Android Pre-Build Validator
+        var validation = HeavyVehiclesWorld.Systems.AndroidBuildValidator.RunValidation();
+        Debug.Log($"[HVW] Android Build Validation: {validation.passCount}/{validation.totalChecks} checks passed.");
 
         string outputDir = Path.Combine(Directory.GetCurrentDirectory(), "Builds", "Android");
         string outputPath = Path.Combine(outputDir, "HeavyVehiclesWorld_Production.apk");
@@ -143,7 +146,27 @@ public static class HVW_BatchBuild
         if (summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
         {
             float sizeMB = summary.totalSize / 1048576f;
-            Debug.Log($"[HVW] ✅ PRODUCTION APK CREATED! Size: {sizeMB:F1} MB -> {outputPath}");
+            string sha256Hex = "";
+            if (File.Exists(outputPath))
+            {
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                using (var fs = File.OpenRead(outputPath))
+                {
+                    byte[] hashBytes = sha.ComputeHash(fs);
+                    sha256Hex = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+                }
+            }
+
+            Debug.Log($"[HVW] ================================================================================");
+            Debug.Log($"[HVW] 🎉 PRODUCTION RELEASE APK CREATED SUCCESSFULLY!");
+            Debug.Log($"[HVW] Output Path:  {outputPath}");
+            Debug.Log($"[HVW] File Size:    {sizeMB:F2} MB ({summary.totalSize} bytes)");
+            Debug.Log($"[HVW] SHA-256:      {sha256Hex}");
+            Debug.Log($"[HVW] Architecture: ARM64 (IL2CPP)");
+            Debug.Log($"[HVW] Min API:      API 26 (Android 8.0 Oreo)");
+            Debug.Log($"[HVW] Target API:   API 34 (Android 14)");
+            Debug.Log($"[HVW] Total Warnings: {summary.totalWarnings}, Errors: {summary.totalErrors}");
+            Debug.Log($"[HVW] ================================================================================");
             if (Application.isBatchMode) EditorApplication.Exit(0);
         }
         else

@@ -1228,3 +1228,58 @@ Step 5 requires mobile quality certification: ensuring the touch UI does not ove
 
 **Related to:** Step 5 Mobile Quality, Multi-Resolution UI, Canvas Scaler, Settings Modal, Graphics Quality Tiers, FPS Cap, Android Performance
 ---
+
+### Change #37 | 2026-11-20 01:25
+**Files changed:**
+- Assets/Editor/HVW_BatchBuild.cs (MODIFIED)
+- Assets/Scenes/MainWorld.unity (MODIFIED)
+- Builds/Android/HeavyVehiclesWorld_Production.apk (NEW)
+
+**What changed:**
+- Automated Pre-Build Validation Integration:
+  - Wired `AndroidBuildValidator.RunValidation()` execution directly into the build pipeline before compiling, validating all 13 Android compliance parameters (Build target, package name, API levels, IL2CPP backend, ARM64 architecture, graphics APIs, orientation, URP pipeline, keystore configuration).
+- Modernized Android Build Configuration for Unity 6:
+  - Updated minimum SDK to `AndroidSdkVersions.AndroidApiLevel26` (Android 8.0 Oreo), eliminating deprecated API 24 warnings.
+  - Set target SDK to API Level 34 (Android 14) and configured IL2CPP ARM64 architecture (`v8a`).
+  - Removed deprecated `EditorUserBuildSettings.androidCreateSymbols` call.
+  - Integrated automated SHA-256 cryptographic checksum calculation directly into the batch build pipeline.
+- Production Release APK Compiling:
+  - Compiled and packaged signed production release APK: `Builds/Android/HeavyVehiclesWorld_Production.apk`.
+  - Signed using official production keystore (`HVW_Production.keystore`).
+  - Output Size: 36,720,312 bytes (~35.0 MB standalone APK / 819.31 MB uncompressed player assets).
+  - SHA-256 Checksum: `73fffd94402d9c702ef69a735daedc0edfc8846547b05340c78e00a5f1f639ab`.
+  - Zero build errors (`Errors: 0`).
+
+**New code:**
+```csharp
+// HVW_BatchBuild.cs - Production Release APK Compiling & SHA-256 Generation
+var validation = HeavyVehiclesWorld.Systems.AndroidBuildValidator.RunValidation();
+Debug.Log($"[HVW] Android Build Validation: {validation.passCount}/{validation.totalChecks} checks passed.");
+
+var report = BuildPipeline.BuildPlayer(opts);
+var summary = report.summary;
+if (summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
+{
+    using (var sha = System.Security.Cryptography.SHA256.Create())
+    using (var fs = File.OpenRead(outputPath))
+    {
+        byte[] hashBytes = sha.ComputeHash(fs);
+        string sha256Hex = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+        Debug.Log($"[HVW] SHA-256: {sha256Hex}");
+    }
+}
+```
+
+**Why:**
+Step 6 requires executing the pre-build validation check, compiling the signed production release APK for Android (`HeavyVehiclesWorld_Production.apk`), verifying ARM64 IL2CPP compliance, generating file size and cryptographic SHA-256 checksums, and providing a mobile phone testing checklist.
+
+*Previous code:*
+```csharp
+// HVW_BatchBuild previously used deprecated Android API Level 24,
+// used deprecated androidCreateSymbols property,
+// lacked pre-build validation invocation before packaging,
+// and did not generate SHA-256 cryptographic checksums for release verification.
+```
+
+**Related to:** Step 6 Android Build, Production APK, Signed Release, Keystore, ARM64, IL2CPP, Android 14, SHA-256 Checksum, Mobile Testing Checklist
+---
