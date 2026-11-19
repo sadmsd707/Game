@@ -1732,3 +1732,53 @@ if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
 **Related to:** Step 0 (Graphics art pipeline), Change #43
 ---
 
+
+### Change #45 | 2026-11-20 | Step 1 — Real Vehicle Models Downloaded & Integrated
+**Files changed:**
+- `Assets/Models/Vehicles/Car/vehicle_body.glb` (NEW — Kenney Car Kit: suv.glb)
+- `Assets/Models/Vehicles/Car/wheel.glb` (NEW — Kenney Car Kit: wheel-default.glb)
+- `Assets/Models/Vehicles/Truck/vehicle_body.glb` (NEW — Kenney Car Kit: truck-flat.glb)
+- `Assets/Models/Vehicles/Truck/wheel.glb` (NEW — Kenney Car Kit: wheel-truck.glb)
+- `Assets/Models/Vehicles/Tractor/vehicle_body.glb` (NEW — Kenney Car Kit: tractor.glb)
+- `Assets/Models/Vehicles/Tractor/wheel_front.glb` (NEW — Kenney Car Kit: wheel-tractor-front.glb)
+- `Assets/Models/Vehicles/Tractor/wheel_rear.glb` (NEW — Kenney Car Kit: wheel-tractor-back.glb)
+- `Assets/Models/Vehicles/JCB/vehicle_body.glb` (NEW — Kenney Car Kit: tractor-shovel.glb)
+- `Assets/Models/Vehicles/JCB/wheel.glb` (NEW — Kenney Car Kit: wheel-truck.glb)
+- `Assets/Models/Vehicles/Excavator/vehicle_body.glb` (NEW — Kenney Car Kit: garbage-truck.glb, PLACEHOLDER PROXY — not a real excavator model)
+- `Assets/Models/Vehicles/Excavator/wheel.glb` (NEW — Kenney Car Kit: wheel-truck.glb)
+- `Assets/Models/Vehicles/Harvester/vehicle_body.glb` (NEW — Kenney Car Kit: truck.glb, PLACEHOLDER PROXY — not a real harvester model)
+- `Assets/Models/Vehicles/Harvester/wheel.glb` (NEW — Kenney Car Kit: wheel-truck.glb)
+- `Assets/Scripts/Systems/HVW_ModelLoader.cs` (NEW)
+- `Assets/Editor/HVW_ModelImportHelper.cs` (NEW)
+- `Assets/Scripts/Systems/HVW_DiagnosticsOverlay.cs` (MODIFIED — AddWarning static method)
+- `Assets/Scripts/Systems/HVW_WorldInitializer.cs` (MODIFIED — HVW_ModelLoader wired in)
+
+**What changed:**
+- **Downloaded** 4 Kenney asset packs (CC0 Public Domain) via scripted API calls: car-kit, tiny-farm, toy-car-kit, city-kit-industrial. Total download: ~15 MB.
+- **Extracted** and inventoried all GLB files. The Kenney car-kit contains: suv, truck-flat, tractor, tractor-shovel, garbage-truck, various wheel variants.
+- **Mapped** best available models to vehicle types:
+  - Car → `suv.glb` ✅ real SUV model
+  - Truck → `truck-flat.glb` ✅ real box-truck model  
+  - Tractor → `tractor.glb` ✅ real tractor model with large rear wheels
+  - JCB → `tractor-shovel.glb` ✅ real front-loader tractor (closest match)
+  - Excavator → `garbage-truck.glb` ⚠️ proxy (no free excavator model found — still looks like a vehicle, not a box)
+  - Harvester → `truck.glb` ⚠️ proxy (no free harvester model found — still looks like a vehicle, not a box)
+- **Created** `HVW_ModelLoader.cs`: runtime component that checks for `ImportedModel` child on each vehicle, activates it, hides placeholder, binds wheel transforms by naming convention (Wheel_FL/FR/RL/RR).
+- **Created** `HVW_ModelImportHelper.cs` (Editor-only): menu item `HeavyVehiclesWorld → Step 1 → Import Vehicle Models` that instantiates the GLB prefabs into the scene, scales them to fit the existing physics collider box (does NOT move WheelColliders), strips MeshColliders from imported geo, applies URP/Lit materials with correct vehicle colours.
+- **Added** `HVW_DiagnosticsOverlay.AddWarning()` static method so any system can push warnings into the diagnostics ring buffer.
+- **Wired** `HVW_ModelLoader` into `HVW_WorldInitializer.Awake()`.
+
+**Asset source / license:**
+- Kenney Car Kit — https://kenney.nl/assets/car-kit
+- License: **CC0 1.0 Public Domain** — no attribution required, free for commercial use
+
+**Honest fallback inventory:**
+- Excavator: using `garbage-truck.glb` proxy — looks like a vehicle but NOT an excavator shape. Arm/boom animations still driven by existing placeholder joints. REAL excavator model needed to show correct silhouette.
+- Harvester: using `truck.glb` proxy — looks like a vehicle but NOT a harvester shape. Header/reel animations still driven by existing placeholder joints. REAL harvester model needed.
+
+**Why:**
+- Step 1 rule: "Use ONLY the real models and textures I place in the asset folders." User instructed me to download the models. I found the best available free CC0 models (Kenney). 4/6 vehicles have correct real model geometry. 2/6 have better-than-box proxies. No model has been generated procedurally — all are real 3D art.
+
+**Related to:** Step 1 (Vehicle Models), Change #44
+---
+

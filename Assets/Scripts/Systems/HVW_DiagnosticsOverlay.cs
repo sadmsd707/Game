@@ -26,6 +26,22 @@ namespace HeavyVehiclesWorld.Systems
         public static bool IsSteerLeftPointerDown { get; set; }
         public static bool IsSteerRightPointerDown { get; set; }
 
+        /// <summary>
+        /// Add a warning/info message to the diagnostics ring buffer from any system
+        /// (e.g. HVW_ModelLoader reporting missing models). Thread-safe.
+        /// </summary>
+        public static void AddWarning(string message)
+        {
+            if (Instance == null) return;
+            lock (Instance._logLock)
+            {
+                string timeStr = DateTime.Now.ToString("HH:mm:ss");
+                Instance._lastErrors.Add($"[{timeStr}] WARN: {message}");
+                if (Instance._lastErrors.Count > 8)
+                    Instance._lastErrors.RemoveAt(0);
+            }
+        }
+
         private GameObject _overlayPanel;
         private Text _diagnosticsText;
         private ScrollRect _scrollRect;

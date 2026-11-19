@@ -73,6 +73,10 @@ namespace HeavyVehiclesWorld.Systems
             SetupFollowCamera();
             BuildMobileUI();
 
+            // Step 1 — activate any real imported models, hide placeholders where model exists
+            if (GetComponent<HVW_ModelLoader>() == null)
+                gameObject.AddComponent<HVW_ModelLoader>();
+
             // Set Car as default starting vehicle
             if (_allVehicles.Count > 0)
             {
