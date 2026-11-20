@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEditor.SceneManagement;
 using System.IO;
 using HeavyVehiclesWorld.Systems;
 
@@ -12,11 +13,25 @@ namespace HeavyVehiclesWorld.Editor
     /// </summary>
     public static class HVW_BatchAutomation
     {
+        private const string MAIN_SCENE_PATH = "Assets/Scenes/MainWorld.unity";
+
+        private static void EnsureMainSceneOpen()
+        {
+            var activeScene = EditorSceneManager.GetActiveScene();
+            if (activeScene.path != MAIN_SCENE_PATH)
+            {
+                Debug.Log($"[HVW_Batch] Opening scene: {MAIN_SCENE_PATH}");
+                EditorSceneManager.OpenScene(MAIN_SCENE_PATH, OpenSceneMode.Single);
+            }
+        }
+
         // ── COMBINED: Step 1 + Step 2 + save scene ──────────────────────────
         [MenuItem("HeavyVehiclesWorld/Batch - Apply All Steps (1+2)")]
         public static void ApplyAllSteps()
         {
             Debug.Log("[HVW_Batch] ===== Starting Step 1 + Step 2 combined apply =====");
+
+            EnsureMainSceneOpen();
 
             // Step 1 — Vehicle model import
             try { HVW_ModelImportHelper.ImportVehicleModels(); Debug.Log("[HVW_Batch] Step 1 complete."); }
@@ -28,7 +43,7 @@ namespace HeavyVehiclesWorld.Editor
 
             // Save scene and project
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-            UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+            EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("[HVW_Batch] ===== All steps applied and saved =====");
@@ -38,9 +53,10 @@ namespace HeavyVehiclesWorld.Editor
         public static void ApplyStep2()
         {
             Debug.Log("[HVW_Batch] ===== Starting Step 2 (terrain + sky) =====");
+            EnsureMainSceneOpen();
             HVW_TerrainTextureImporter.ApplyTerrainTexturesAndSky();
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-            UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+            EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("[HVW_Batch] ===== Step 2 complete =====");
