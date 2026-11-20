@@ -327,6 +327,18 @@ namespace HeavyVehiclesWorld.Systems
                 targetTerrain = terrainGo.GetComponent<Terrain>();
             }
 
+            // ── Step 2: Try to load real PBR textures from Resources/ first ──
+            bool realTexturesLoaded = TryLoadRealTerrainTextures();
+            if (realTexturesLoaded)
+            {
+                Debug.Log("[VisualSystem] Real PBR terrain textures loaded from Resources/.");
+            }
+            else
+            {
+                Debug.LogWarning("[VisualSystem] Real PBR textures not found in Resources/ — using procedural fallback.");
+                HVW_DiagnosticsOverlay.AddWarning("Terrain: using procedural textures. Place PBR PNGs in Assets/Resources/Terrain/.");
+            }
+
             var normalMap = CreateProceduralNormalMap(64);
 
             // Create TerrainLayers with procedural textures and normal maps
@@ -452,11 +464,78 @@ namespace HeavyVehiclesWorld.Systems
             }
         }
 
+        // ══════════════════════════════════════════════════════════════════════
+        // Step 2 — Runtime PBR terrain texture loader
+        // Looks for textures in Resources/Terrain/<name>_diff|nor|rough
+        // so the APK can ship real PBR textures without streaming assets.
+        // ══════════════════════════════════════════════════════════════════════
+        private bool TryLoadRealTerrainTextures()
+        {
+            // Map: (resourceBaseName, TerrainLayer ref, tileSize, smoothness, metallic)
+            var defs = new[]
+            {
+                new { res="Terrain/grass",   tile=new Vector2(8f,8f),   smooth=0.15f, metal=0.00f, layerRef=(System.Action<TerrainLayer>)(l => grassLayer   = l) },
+                new { res="Terrain/dirt",    tile=new Vector2(6f,6f),   smooth=0.10f, metal=0.00f, layerRef=(System.Action<TerrainLayer>)(l => dirtLayer    = l) },
+                new { res="Terrain/asphalt", tile=new Vector2(10f,10f), smooth=0.30f, metal=0.05f, layerRef=(System.Action<TerrainLayer>)(l => asphaltLayer = l) },
+                new { res="Terrain/rock",    tile=new Vector2(12f,12f), smooth=0.12f, metal=0.02f, layerRef=(System.Action<TerrainLayer>)(l => rockLayer    = l) },
+            };
+
+            bool anyLoaded = false;
+            foreach (var d in defs)
+            {
+                // Resources.Load looks in Assets/Resources/<path>
+                var diff  = Resources.Load<Texture2D>($"{d.res}_diff_1k");
+                if (diff == null) continue; // Not found — keep procedural for this layer
+
+                var layer = new TerrainLayer
+                {
+                    name        = $"Layer_{System.IO.Path.GetFileName(d.res)}_PBR",
+                    tileSize    = d.tile,
+                    smoothness  = d.smooth,
+                    metallic    = d.metal,
+                    diffuseTexture = diff
+                };
+
+                var nor   = Resources.Load<Texture2D>($"{d.res}_nor_1k");
+                var rough = Resources.Load<Texture2D>($"{d.res}_rough_1k");
+                if (nor   != null) layer.normalMapTexture = nor;
+                if (rough != null) layer.maskMapTexture   = rough;
+
+                d.layerRef(layer);
+                anyLoaded = true;
+            }
+
+            // Apply layers to terrain if any real textures were found
+            if (anyLoaded && targetTerrain != null && targetTerrain.terrainData != null)
+            {
+                var layers = new TerrainLayer[]
+                {
+                    grassLayer   ?? FallbackLayer("grass",   new Color(0.26f,0.50f,0.22f), new Vector2(8f,8f)),
+                    dirtLayer    ?? FallbackLayer("dirt",    new Color(0.48f,0.35f,0.20f), new Vector2(6f,6f)),
+                    asphaltLayer ?? FallbackLayer("asphalt", new Color(0.18f,0.18f,0.20f), new Vector2(10f,10f)),
+                    rockLayer    ?? FallbackLayer("rock",    new Color(0.42f,0.42f,0.45f), new Vector2(12f,12f)),
+                };
+                targetTerrain.terrainData.terrainLayers = layers;
+            }
+
+            return anyLoaded;
+        }
+
+        private TerrainLayer FallbackLayer(string name, Color col, Vector2 tile)
+        {
+            return new TerrainLayer
+            {
+                name = $"Layer_{name}_Fallback",
+                tileSize = tile,
+                diffuseTexture = CreateProceduralTexture(col, 64),
+                normalMapTexture = CreateProceduralNormalMap(64)
+            };
+        }
+
         private void PaintTerrainAlphamaps(TerrainData td)
         {
             int res = td.alphamapResolution;
-            if (res <= 0) res = 128;
-            float[,,] maps = new float[res, res, 4];
+            if (res <= 0) res = 128;            float[,,] maps = new float[res, res, 4];
             float terrainWidth = td.size.x;
             float terrainLength = td.size.z;
 

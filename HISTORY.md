@@ -1782,3 +1782,61 @@ if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
 **Related to:** Step 1 (Vehicle Models), Change #44
 ---
 
+
+---
+### Change #46 | 2026-11-20 | Step 2 — Real PBR Terrain Textures + HDRI Sky
+
+**Files changed:**
+- `Assets/Textures/Terrain/grass_diff_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/grass_nor_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/grass_rough_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/dirt_diff_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/dirt_nor_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/dirt_rough_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/asphalt_diff_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/asphalt_nor_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/asphalt_rough_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/rock_diff_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/rock_nor_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Terrain/rock_rough_1k.png` (NEW — Poly Haven, CC0)
+- `Assets/Textures/Skybox/autumn_field_puresky_1k.hdr` (NEW — Poly Haven, CC0)
+- `Assets/Resources/Terrain/*.png` (NEW — Runtime copies of above PNGs for Resources.Load)
+- `Assets/Resources/Skybox/autumn_field_puresky_1k.hdr` (NEW — Runtime copy)
+- `Assets/Editor/HVW_TerrainTextureImporter.cs` (NEW — Editor menu script)
+- `Assets/Scripts/Systems/HVW_VisualSystem.cs` (MODIFIED — added TryLoadRealTerrainTextures(), FallbackLayer())
+- `Assets/Terrain/` (NEW directory — where TerrainLayer .terrainlayer assets will be saved by Editor script)
+
+**What changed:**
+- Downloaded 12 PBR texture maps (1K) from Poly Haven (CC0) covering grass, dirt, asphalt and rock. Each set includes diffuse/albedo, OpenGL normal, and roughness maps.
+- Downloaded HDRI sky `autumn_field_puresky_1k.hdr` (1K) from Poly Haven (CC0).
+- All textures placed in `Assets/Textures/Terrain/` and `Assets/Textures/Skybox/` (source, Editor-time).
+- Copied to `Assets/Resources/Terrain/` and `Assets/Resources/Skybox/` (runtime, `Resources.Load`).
+- New Editor script `HVW_TerrainTextureImporter.cs`: menu item `HeavyVehiclesWorld → Step 2 - Apply Terrain Textures & Sky` that:
+  - Sets correct Unity import settings on each PNG (NormalMap type for `_nor_` files, sRGB off for normals/roughness, Trilinear filter, Aniso 4, ASTC compression for Android)
+  - Builds 4 `TerrainLayer` objects (grass, dirt, asphalt, rock) with correct tile sizes, smoothness and metallic values
+  - Assigns diffuse, normal and roughness (mask map) textures to each layer
+  - Saves layers as `.terrainlayer` assets under `Assets/Terrain/`
+  - Applies layers to the scene Terrain's TerrainData
+  - Loads the HDRI, creates a `Skybox/Panoramic` material (`HDRISkybox_AutumnField.mat`) and sets it as `RenderSettings.skybox`
+  - Fixes horizon yellow-green band: `ExponentialSquared` fog (density 0.004, cool blue-grey tint), sun angle 52° elevation, sun colour near-white warm (1.0, 0.97, 0.90)
+  - Updates `HVW_VisualSystem` serialized fields with the terrain and layer references
+- Modified `HVW_VisualSystem.cs`: added `TryLoadRealTerrainTextures()` — at runtime (Awake), loads the PBR PNGs from `Resources/Terrain/` via `Resources.Load<Texture2D>()` and applies them to Terrain layers. Falls back to procedural solid-colour layers with `HVW_DiagnosticsOverlay.AddWarning()` if any texture is missing. Added `FallbackLayer()` helper.
+
+**Why:** Previous terrain was flat procedural solid colours — ground, road and grass all looked like painted boxes. This provides real PBR textures so the terrain looks like real soil, asphalt and rock once Unity imports them. HDRI removes the procedural yellow-green horizon band.
+
+**Sources (all CC0 / public domain):**
+- `grass_ground` → polyhaven.com/a/grass_ground
+- `brown_mud_02` → polyhaven.com/a/brown_mud_02
+- `asphalt_02` → polyhaven.com/a/asphalt_02
+- `aerial_rocks_02` → polyhaven.com/a/aerial_rocks_02
+- `autumn_field_puresky` → polyhaven.com/a/autumn_field_puresky
+
+**Status:** ASSETS DOWNLOADED AND SCRIPTS WRITTEN. User must open Unity and run `HeavyVehiclesWorld → Step 2 - Apply Terrain Textures & Sky` to apply textures to the scene. No screenshot proof yet (Rule 3).
+
+**What is still missing:**
+- Screenshots from real player build (Windows standalone) — cannot take without user opening Unity and running the menu item
+- Excavator and Harvester still use proxy models (garbage-truck, truck shapes) — not real silhouettes
+
+**Related to:** Step 2 (Real Ground, Road and Sky)
+
+---
