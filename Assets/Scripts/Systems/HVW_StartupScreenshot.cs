@@ -60,14 +60,22 @@ namespace HeavyVehiclesWorld.Systems
             Directory.CreateDirectory(shotDir);
             Debug.Log($"[Screenshot] Saving to: {shotDir}");
 
-            var initializer = FindAnyObjectByType<HVW_WorldInitializer>();
+            var initializer = HVW_WorldInitializer.Instance ?? FindAnyObjectByType<HVW_WorldInitializer>();
+            float waitTimer = 15f;
+            while (initializer == null && waitTimer > 0f)
+            {
+                yield return new WaitForSeconds(0.5f);
+                waitTimer -= 0.5f;
+                initializer = HVW_WorldInitializer.Instance ?? FindAnyObjectByType<HVW_WorldInitializer>();
+            }
+
             if (initializer == null)
             {
-                Debug.LogError("[Screenshot] HVW_WorldInitializer not found.");
+                Debug.LogError("[Screenshot] HVW_WorldInitializer not found after waiting.");
                 yield break;
             }
 
-            var photoCamera = FindAnyObjectByType<HVW_PhotoCamera>();
+            var photoCamera = HVW_PhotoCamera.Instance ?? FindAnyObjectByType<HVW_PhotoCamera>();
 
             // Iterate over all vehicle types in order
             var vehicleTypes = System.Enum.GetValues(typeof(Vehicles.VehicleType));
