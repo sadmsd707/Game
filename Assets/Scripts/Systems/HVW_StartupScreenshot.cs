@@ -19,6 +19,22 @@ namespace HeavyVehiclesWorld.Systems
         private static readonly string[] ANGLES_LABEL = { "front34", "side", "rear" };
         private static readonly float[]  ANGLES_AZ    = { 45f, 90f, 180f };
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void AutoBootstrap()
+        {
+            bool wantScreenshots = false;
+            foreach (var arg in System.Environment.GetCommandLineArgs())
+            {
+                if (arg == "-hvwScreenshots") { wantScreenshots = true; break; }
+            }
+            if (!wantScreenshots) return;
+
+            var go = new GameObject("HVW_StartupScreenshotRunner");
+            go.AddComponent<HVW_StartupScreenshot>();
+            DontDestroyOnLoad(go);
+            Debug.Log("[Screenshot] AutoBootstrap started with -hvwScreenshots flag.");
+        }
+
         private void Start()
         {
 #if UNITY_EDITOR
