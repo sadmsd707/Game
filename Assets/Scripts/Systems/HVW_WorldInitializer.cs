@@ -77,6 +77,10 @@ namespace HeavyVehiclesWorld.Systems
             if (GetComponent<HVW_ModelLoader>() == null)
                 gameObject.AddComponent<HVW_ModelLoader>();
 
+            // Screenshot automation (activates only when -hvwScreenshots flag is passed)
+            if (GetComponent<HVW_StartupScreenshot>() == null)
+                gameObject.AddComponent<HVW_StartupScreenshot>();
+
             // Set Car as default starting vehicle
             if (_allVehicles.Count > 0)
             {
@@ -1621,6 +1625,13 @@ namespace HeavyVehiclesWorld.Systems
             {
                 SelectVehicle(_allVehicles[index]);
             }
+        }
+
+        /// <summary>Switch to the first vehicle of the given type. Used by screenshot automation.</summary>
+        public void SwitchToVehicle(Vehicles.VehicleType type)
+        {
+            var vc = _allVehicles.Find(v => v.vehicleType == type);
+            if (vc != null) SelectVehicle(vc);
         }
 
         public void ResetActiveVehicle()

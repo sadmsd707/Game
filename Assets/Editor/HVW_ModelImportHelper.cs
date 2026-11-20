@@ -126,7 +126,8 @@ namespace HeavyVehiclesWorld.Editor
             AssetDatabase.Refresh();
 
             Debug.Log(report.ToString());
-            EditorUtility.DisplayDialog("Step 1 — Vehicle Model Import", report.ToString(), "OK");
+            if (!Application.isBatchMode)
+                EditorUtility.DisplayDialog("Step 1 — Vehicle Model Import", report.ToString(), "OK");
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

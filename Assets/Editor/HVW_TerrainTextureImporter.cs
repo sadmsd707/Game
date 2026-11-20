@@ -41,7 +41,8 @@ namespace HeavyVehiclesWorld.Editor
             {
                 report.AppendLine("❌ No Terrain found in scene. Run HVW_SceneGenerator first.");
                 Debug.LogError(report.ToString());
-                EditorUtility.DisplayDialog("Step 2", report.ToString(), "OK");
+                if (!Application.isBatchMode)
+                    EditorUtility.DisplayDialog("Step 2", report.ToString(), "OK");
                 return;
             }
 
@@ -103,7 +104,8 @@ namespace HeavyVehiclesWorld.Editor
             AssetDatabase.Refresh();
 
             Debug.Log(report.ToString());
-            EditorUtility.DisplayDialog("Step 2 — Complete", report.ToString(), "OK");
+            if (!Application.isBatchMode)
+                EditorUtility.DisplayDialog("Step 2 — Complete", report.ToString(), "OK");
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────

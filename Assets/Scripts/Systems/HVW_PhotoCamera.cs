@@ -41,6 +41,9 @@ namespace HeavyVehiclesWorld.Systems
         // ── Public API ────────────────────────────────────────────────────────
         public bool IsActive => _isActive;
 
+        /// <summary>Set orbit azimuth in degrees (0=behind, 45=front-right, 90=side, 180=front).</summary>
+        public void SetAzimuth(float degrees) { orbitAzimuth = degrees; ApplyOrbit(); }
+
         public void Activate(Transform target)
         {
             _target   = target;
