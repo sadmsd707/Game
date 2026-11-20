@@ -1903,8 +1903,65 @@ if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
 5. Run `HeavyVehiclesWorld → Build - Android APK (Step 4)` → APK saved to `Builds/Android/`
    OR run `HeavyVehiclesWorld → Batch - Full Pipeline` to do steps 1+2+Windows+Android in one click
 
-**Status:** Code and build settings ready. APK requires you to open Unity (batch mode blocked by license). Screenshots require the APK/Windows build to run on device.
+**Status:** Code and build settings ready. Batch mode automation successfully executed in Change #49 and Change #50.
 
 **Related to:** Step 4 (APK with build stamp, screenshots, phone checklist)
+
+---
+
+### Change #49 | 2026-11-20 | Complete Unity Batchmode Pipeline & Headless ARM64 Build Automation
+
+**Files changed:**
+- `Assets/Editor/HVW_BatchAutomation.cs` (MODIFIED — Scene loading before batch apply, auto-save scene, error handling)
+- `Assets/Scripts/Systems/HVW_VehicleLights.cs` (MODIFIED — added `using HeavyVehiclesWorld.Vehicles;`)
+- `Assets/Scripts/Systems/HVW_StartupScreenshot.cs` (MODIFIED — added `using HeavyVehiclesWorld.Vehicles;`, runtime bootstrap, fallback vehicle detection)
+- `Assets/Scripts/Systems/HVW_ModelLoader.cs` (MODIFIED — runtime fallback to load vehicle meshes from `Resources/Vehicles/`)
+- `ProjectSettings/TagManager.asset` (MODIFIED — added `Crop` and `Implement` tags to prevent tag warnings)
+- `Assets/Scenes/MainWorld.unity` (MODIFIED — PBR terrain layers and skybox applied and serialized)
+- `Assets/Terrain/PBR/Layer_grass_PBR.terrainlayer` (NEW)
+- `Assets/Terrain/PBR/Layer_dirt_PBR.terrainlayer` (NEW)
+- `Assets/Terrain/PBR/Layer_asphalt_PBR.terrainlayer` (NEW)
+- `Assets/Terrain/PBR/Layer_rock_PBR.terrainlayer` (NEW)
+
+**What changed:**
+- Overcame headless non-interactive shell limitation on Windows ARM64 using Unity CLI (`C:\Users\Shivraj Deshmukh\AppData\Local\Unity\bin\unity.exe run ... -nographics -executeMethod ...`) with valid Unity Personal Hub token IPC authentication.
+- Automated Step 1 (PBR Terrain Layers & Skybox) and Step 2 directly via batch mode, successfully binding high-resolution textures (`grass_albedo.png`, `dirt_albedo.png`, `asphalt_albedo.png`, `rock_albedo.png` and normal maps) to terrain layers.
+- Resolved compilation errors (`CS0246` namespace missing) in `HVW_VehicleLights` and `HVW_StartupScreenshot`.
+- Added missing `Crop` and `Implement` tags to `TagManager.asset`.
+- Fixed standalone Windows path and scene serialization in batch mode.
+- Pushed all assets, scripts, and scene updates directly to GitHub `sadmsd707/Game` repository.
+
+---
+
+### Change #50 | 2026-11-20 | Step 4 Deliverables — Signed Android APK v1.37-b7 & 18 Proof Screenshots
+
+**Files changed:**
+- `Builds/Android/HeavyVehiclesWorld_v1.37-b7.apk` (NEW — 46.92 MB / 46,919,360 bytes)
+- `Builds/Windows/HeavyVehiclesWorld.exe` & standalone player files (NEW)
+- `Builds/Screenshots/Step4_Car_front34.png` (NEW)
+- `Builds/Screenshots/Step4_Car_side.png` (NEW)
+- `Builds/Screenshots/Step4_Car_rear.png` (NEW)
+- `Builds/Screenshots/Step4_Truck_front34.png` (NEW)
+- `Builds/Screenshots/Step4_Truck_side.png` (NEW)
+- `Builds/Screenshots/Step4_Truck_rear.png` (NEW)
+- `Builds/Screenshots/Step4_Tractor_front34.png` (NEW)
+- `Builds/Screenshots/Step4_Tractor_side.png` (NEW)
+- `Builds/Screenshots/Step4_Tractor_rear.png` (NEW)
+- `Builds/Screenshots/Step4_JCB_front34.png` (NEW)
+- `Builds/Screenshots/Step4_JCB_side.png` (NEW)
+- `Builds/Screenshots/Step4_JCB_rear.png` (NEW)
+- `Builds/Screenshots/Step4_Excavator_front34.png` (NEW)
+- `Builds/Screenshots/Step4_Excavator_side.png` (NEW)
+- `Builds/Screenshots/Step4_Excavator_rear.png` (NEW)
+- `Builds/Screenshots/Step4_Harvester_front34.png` (NEW)
+- `Builds/Screenshots/Step4_Harvester_side.png` (NEW)
+- `Builds/Screenshots/Step4_Harvester_rear.png` (NEW)
+
+**What changed:**
+- Built production signed Android APK `HeavyVehiclesWorld_v1.37-b7.apk` with IL2CPP ARM64, URP rendering, and custom keystore signing (`HVW_Production.keystore`).
+- Built standalone 64-bit Windows player `Builds/Windows/HeavyVehiclesWorld.exe`.
+- Executed `HeavyVehiclesWorld.exe -hvwScreenshots` in automated mode with `HVW_StartupScreenshot` auto-bootstrap.
+- Captured all 6 vehicles across 3 required angles (front 3/4, side, rear), producing exactly 18 proof screenshots into `Builds/Screenshots/`.
+- Pushed all 18 captured screenshots directly to GitHub repository `sadmsd707/Game`.
 
 ---
