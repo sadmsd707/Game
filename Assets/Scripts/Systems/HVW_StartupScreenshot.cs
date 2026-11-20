@@ -61,7 +61,7 @@ namespace HeavyVehiclesWorld.Systems
             Debug.Log($"[Screenshot] Saving to: {shotDir}");
 
             var initializer = HVW_WorldInitializer.Instance ?? FindAnyObjectByType<HVW_WorldInitializer>();
-            float waitTimer = 15f;
+            float waitTimer = 10f;
             while (initializer == null && waitTimer > 0f)
             {
                 yield return new WaitForSeconds(0.5f);
@@ -71,8 +71,7 @@ namespace HeavyVehiclesWorld.Systems
 
             if (initializer == null)
             {
-                Debug.LogError("[Screenshot] HVW_WorldInitializer not found after waiting.");
-                yield break;
+                Debug.LogWarning("[Screenshot] HVW_WorldInitializer not found — using direct VehicleController discovery.");
             }
 
             var photoCamera = HVW_PhotoCamera.Instance ?? FindAnyObjectByType<HVW_PhotoCamera>();
@@ -81,9 +80,26 @@ namespace HeavyVehiclesWorld.Systems
             var vehicleTypes = System.Enum.GetValues(typeof(Vehicles.VehicleType));
             foreach (Vehicles.VehicleType vType in vehicleTypes)
             {
-                // Switch active vehicle
-                initializer.SwitchToVehicle(vType);
+                if (initializer != null)
+                {
+                    initializer.SwitchToVehicle(vType);
+                }
+                else
+                {
+                    var allVehicles = FindObjectsByType<VehicleController>(FindObjectsSortMode.None);
+                    foreach (var v in allVehicles)
+                    {
+                        if (v.vehicleType == vType)
+                        {
+                            if (photoCamera != null) photoCamera.Activate(v.transform);
+                            break;
+                        }
+                    }
+                }
                 yield return new WaitForSeconds(1.5f);
+
+                if (photoCamera == null)
+                    photoCamera = HVW_PhotoCamera.Instance ?? FindAnyObjectByType<HVW_PhotoCamera>();
 
                 // For each camera angle
                 for (int a = 0; a < ANGLES_AZ.Length; a++)
