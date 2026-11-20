@@ -39,10 +39,8 @@ namespace HeavyVehiclesWorld.Systems
         {
             yield return new WaitForSeconds(5f); // Let world finish loading
 
-            string shotDir = Path.Combine(
-                Path.GetDirectoryName(System.Environment.GetCommandLineArgs()[0]),
-                "..", "..", "..", "Builds", "Screenshots");
-            shotDir = Path.GetFullPath(shotDir);
+            string exeDir = Path.GetDirectoryName(System.Environment.GetCommandLineArgs()[0]);
+            string shotDir = Path.GetFullPath(Path.Combine(exeDir, "..", "Screenshots"));
             Directory.CreateDirectory(shotDir);
             Debug.Log($"[Screenshot] Saving to: {shotDir}");
 
