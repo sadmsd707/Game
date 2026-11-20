@@ -1,8 +1,8 @@
-// HVW_AutoRunner.cs
-// Fires automatically when Unity opens the project.
-// Reads a flag file to decide what to run.
-// Flag file: Assets/Editor/HVW_AutoRunFlag.txt
-// Content: "FULLPIPELINE" or "BUILDONLY"
+// HVW_AutoRunner.cs  — v2
+// Uses EditorPrefs instead of a flag file. Fires on domain reload.
+// Set the pref BEFORE launching Unity:
+//   EditorPrefs.SetString("HVW_AutoRun", "FULLPIPELINE")
+// OR just use the simpler approach: check for the txt flag at a known absolute path.
 
 using UnityEngine;
 using UnityEditor;
@@ -14,155 +14,130 @@ namespace HeavyVehiclesWorld.Editor
     [InitializeOnLoad]
     public static class HVW_AutoRunner
     {
-        private const string FLAG_FILE = "Assets/Editor/HVW_AutoRunFlag.txt";
-        private static bool _scheduled = false;
+        // Absolute path — avoids Application.dataPath timing issues
+        private static readonly string PROJECT_ROOT =
+            Path.GetFullPath(Path.Combine(
+                Path.GetDirectoryName(typeof(HVW_AutoRunner).Assembly.Location),
+                "..", "..", ".."));  // Assembly is in Library/ScriptAssemblies — go up 3 levels
+
+        private static readonly string FLAG_PATH =
+            Path.Combine(PROJECT_ROOT, "Assets", "Editor", "HVW_AutoRunFlag.txt");
 
         static HVW_AutoRunner()
         {
-            // Check flag immediately on domain reload
-            CheckAndSchedule();
-        }
+            // Log so we can confirm the static constructor ran
+            Debug.Log($"[HVW_AutoRunner] v2 Init. Checking flag at: {FLAG_PATH}");
 
-        private static void CheckAndSchedule()
-        {
-            string fullFlag = Path.GetFullPath(
-                Path.Combine(Application.dataPath, "..", FLAG_FILE));
-
-            if (!File.Exists(fullFlag)) return;
-            if (_scheduled) return;
-            _scheduled = true;
-
-            string flag = File.ReadAllText(fullFlag).Trim();
-            File.Delete(fullFlag); // delete immediately so it won't fire twice
-
-            Debug.Log($"[HVW_AutoRunner] Flag '{flag}' detected — scheduling pipeline run...");
-
-            // Delay execution to let Editor fully initialize (scene load, compilation, etc.)
-            int delayCount = 0;
-            EditorApplication.update += DelayedRun;
-
-            void DelayedRun()
+            if (!File.Exists(FLAG_PATH))
             {
-                delayCount++;
-                if (delayCount < 60) return; // wait ~1 second (60 editor update ticks)
-
-                EditorApplication.update -= DelayedRun;
-
-                // Make sure the main scene is open
-                var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
-                if (!scene.isLoaded || string.IsNullOrEmpty(scene.path))
-                {
-                    EditorSceneManager.OpenScene("Assets/Scenes/MainWorld.unity");
-                }
-
-                Debug.Log("[HVW_AutoRunner] Running pipeline...");
-                try
-                {
-                    RunPipeline(flag);
-                }
-                catch (System.Exception ex)
-                {
-                    Debug.LogError($"[HVW_AutoRunner] Pipeline error: {ex}");
-                }
+                Debug.Log("[HVW_AutoRunner] No flag file — skipping auto-run.");
+                return;
             }
+
+            string flag = File.ReadAllText(FLAG_PATH).Trim();
+            Debug.Log($"[HVW_AutoRunner] Flag found: '{flag}' — scheduling pipeline...");
+
+            // Delete immediately to prevent re-run on next domain reload
+            File.Delete(FLAG_PATH);
+            // Also delete .meta if present
+            string meta = FLAG_PATH + ".meta";
+            if (File.Exists(meta)) File.Delete(meta);
+
+            // Schedule with delayCall (fires after Editor is fully ready)
+            EditorApplication.delayCall += () =>
+            {
+                EditorApplication.delayCall += () =>
+                {
+                    ExecutePipeline(flag);
+                };
+            };
         }
 
-        private static void RunPipeline(string flag)
+        private static void ExecutePipeline(string flag)
         {
-            var report = new System.Text.StringBuilder();
-            report.AppendLine($"=== HVW AutoRunner: {flag} ===");
+            Debug.Log($"[HVW_AutoRunner] Executing pipeline: {flag}");
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"[HVW_AutoRunner] Pipeline: {flag}");
 
-            if (flag == "FULLPIPELINE" || flag == "STEP1")
+            // ── Open scene if needed ──────────────────────────────────────────
+            const string SCENE = "Assets/Scenes/MainWorld.unity";
+            var activeScene = EditorSceneManager.GetActiveScene();
+            if (!activeScene.isLoaded || !activeScene.path.Contains("MainWorld"))
+            {
+                Debug.Log($"[HVW_AutoRunner] Opening scene: {SCENE}");
+                EditorSceneManager.OpenScene(SCENE);
+            }
+
+            // ── Step 1: Import vehicle models ─────────────────────────────────
+            if (flag is "FULLPIPELINE" or "STEP1" or "BUILDONLY")
             {
                 try
                 {
                     HVW_ModelImportHelper.ImportVehicleModels();
-                    report.AppendLine("✅ Step 1 (models) complete");
+                    sb.AppendLine("✅ Step 1 (models) complete");
                 }
-                catch (System.Exception e)
-                {
-                    report.AppendLine($"⚠️ Step 1 error: {e.Message}");
-                }
+                catch (System.Exception e) { sb.AppendLine($"⚠️ Step 1: {e.Message}"); }
             }
 
-            if (flag == "FULLPIPELINE" || flag == "STEP2")
+            // ── Step 2: Terrain textures + HDRI sky ──────────────────────────
+            if (flag is "FULLPIPELINE" or "STEP2" or "BUILDONLY")
             {
                 try
                 {
                     HVW_TerrainTextureImporter.ApplyTerrainTexturesAndSky();
-                    report.AppendLine("✅ Step 2 (terrain+sky) complete");
+                    sb.AppendLine("✅ Step 2 (terrain+sky) complete");
                 }
-                catch (System.Exception e)
-                {
-                    report.AppendLine($"⚠️ Step 2 error: {e.Message}");
-                }
+                catch (System.Exception e) { sb.AppendLine($"⚠️ Step 2: {e.Message}"); }
             }
 
-            // Save scene
-            var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
-            EditorSceneManager.SaveScene(scene);
+            // ── Save scene ───────────────────────────────────────────────────
+            EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            report.AppendLine("✅ Scene saved");
+            sb.AppendLine("✅ Scene saved");
 
-            if (flag == "FULLPIPELINE" || flag == "BUILDWINDOWS" || flag == "BUILDONLY")
+            // ── Windows build ─────────────────────────────────────────────────
+            if (flag is "FULLPIPELINE" or "BUILDWINDOWS" or "BUILDONLY")
             {
                 try
                 {
                     HVW_BatchAutomation.BuildWindows();
-                    report.AppendLine("✅ Windows build complete");
-
-                    // Run Windows build for screenshots
+                    sb.AppendLine("✅ Windows build complete");
                     RunWindowsForScreenshots();
-                    report.AppendLine("✅ Screenshot capture started");
+                    sb.AppendLine("✅ Screenshot capture started");
                 }
-                catch (System.Exception e)
-                {
-                    report.AppendLine($"⚠️ Windows build error: {e.Message}");
-                }
+                catch (System.Exception e) { sb.AppendLine($"⚠️ Windows build: {e.Message}"); }
             }
 
-            if (flag == "FULLPIPELINE" || flag == "BUILDANDROID" || flag == "BUILDONLY")
+            // ── Android APK ───────────────────────────────────────────────────
+            if (flag is "FULLPIPELINE" or "BUILDANDROID" or "BUILDONLY")
             {
                 try
                 {
                     HVW_BatchAutomation.BuildAndroid();
-                    report.AppendLine("✅ Android APK complete");
+                    sb.AppendLine("✅ Android APK complete");
                 }
-                catch (System.Exception e)
-                {
-                    report.AppendLine($"⚠️ Android build error: {e.Message}");
-                }
+                catch (System.Exception e) { sb.AppendLine($"⚠️ Android build: {e.Message}"); }
             }
 
-            Debug.Log(report.ToString());
-            if (!Application.isBatchMode)
-                EditorUtility.DisplayDialog("HVW AutoRunner Complete", report.ToString(), "OK");
+            string result = sb.ToString();
+            Debug.Log("[HVW_AutoRunner] DONE:\n" + result);
+            EditorUtility.DisplayDialog("HVW AutoRunner Complete", result, "OK");
         }
 
         private static void RunWindowsForScreenshots()
         {
-            string exePath = Path.GetFullPath(
-                Path.Combine(Application.dataPath, "..", "..", "Builds", "Windows",
-                             "HeavyVehiclesWorld.exe"));
-            if (!File.Exists(exePath))
-            {
-                Debug.LogWarning($"[HVW_AutoRunner] Windows exe not found: {exePath}");
-                return;
-            }
+            string exePath = Path.Combine(PROJECT_ROOT, "..", "Builds", "Windows",
+                                          "HeavyVehiclesWorld.exe");
+            exePath = Path.GetFullPath(exePath);
+            if (!File.Exists(exePath)) { Debug.LogWarning($"[HVW_AutoRunner] exe not found: {exePath}"); return; }
 
-            string shotDir = Path.GetFullPath(
-                Path.Combine(Application.dataPath, "..", "..", "Builds", "Screenshots"));
-            System.IO.Directory.CreateDirectory(shotDir);
-
-            var psi = new System.Diagnostics.ProcessStartInfo
+            Directory.CreateDirectory(Path.Combine(PROJECT_ROOT, "..", "Builds", "Screenshots"));
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName  = exePath,
-                Arguments = "-hvwScreenshots",
-                UseShellExecute = true,
-            };
-            System.Diagnostics.Process.Start(psi);
-            Debug.Log($"[HVW_AutoRunner] Windows standalone launched for screenshots → {shotDir}");
+                FileName = exePath, Arguments = "-hvwScreenshots", UseShellExecute = true
+            });
+            Debug.Log($"[HVW_AutoRunner] Launched for screenshots: {exePath}");
         }
     }
 }
