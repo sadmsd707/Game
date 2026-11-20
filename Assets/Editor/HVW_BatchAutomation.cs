@@ -19,33 +19,18 @@ namespace HeavyVehiclesWorld.Editor
             Debug.Log("[HVW_Batch] ===== Starting Step 1 + Step 2 combined apply =====");
 
             // Step 1 — Vehicle model import
-            try
-            {
-                HVW_ModelImportHelper.ImportVehicleModels();
-                Debug.Log("[HVW_Batch] Step 1 complete.");
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"[HVW_Batch] Step 1 error (non-fatal): {e.Message}");
-            }
+            try { HVW_ModelImportHelper.ImportVehicleModels(); Debug.Log("[HVW_Batch] Step 1 complete."); }
+            catch (System.Exception e) { Debug.LogWarning($"[HVW_Batch] Step 1 error (non-fatal): {e.Message}"); }
 
             // Step 2 — Terrain textures + HDRI sky
-            try
-            {
-                HVW_TerrainTextureImporter.ApplyTerrainTexturesAndSky();
-                Debug.Log("[HVW_Batch] Step 2 complete.");
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogWarning($"[HVW_Batch] Step 2 error (non-fatal): {e.Message}");
-            }
+            try { HVW_TerrainTextureImporter.ApplyTerrainTexturesAndSky(); Debug.Log("[HVW_Batch] Step 2 complete."); }
+            catch (System.Exception e) { Debug.LogWarning($"[HVW_Batch] Step 2 error (non-fatal): {e.Message}"); }
 
             // Save scene and project
             var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
             UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-
             Debug.Log("[HVW_Batch] ===== All steps applied and saved =====");
         }
 
@@ -64,40 +49,71 @@ namespace HeavyVehiclesWorld.Editor
         // ── BUILD WINDOWS STANDALONE ─────────────────────────────────────────
         public static void BuildWindows()
         {
-            string buildDir = Path.Combine(
-                Application.dataPath, "..", "..", "..", "Builds", "Windows");
-            buildDir = Path.GetFullPath(buildDir);
+            string buildDir = Path.GetFullPath(
+                Path.Combine(Application.dataPath, "..", "..", "Builds", "Windows"));
             Directory.CreateDirectory(buildDir);
-
             string exePath = Path.Combine(buildDir, "HeavyVehiclesWorld.exe");
             Debug.Log($"[HVW_Batch] Building Windows standalone to: {exePath}");
+            var opts = new BuildPlayerOptions
+            {
+                scenes = GetScenes(), locationPathName = exePath,
+                target = BuildTarget.StandaloneWindows64, options = BuildOptions.None,
+            };
+            var report = BuildPipeline.BuildPlayer(opts);
+            Debug.Log(report.summary.result == BuildResult.Succeeded
+                ? $"[HVW_Batch] Windows build SUCCEEDED: {exePath}"
+                : $"[HVW_Batch] Windows build FAILED: {report.summary.result}");
+        }
 
-            // Collect scenes
-            var scenes = new System.Collections.Generic.List<string>();
-            foreach (var s in EditorBuildSettings.scenes)
-                if (s.enabled) scenes.Add(s.path);
-            if (scenes.Count == 0) scenes.Add("Assets/Scenes/HeavyVehiclesWorld.unity");
+        // ── BUILD ANDROID APK ────────────────────────────────────────────────
+        [MenuItem("HeavyVehiclesWorld/Build - Android APK (Step 4)")]
+        public static void BuildAndroid()
+        {
+            string buildDir = Path.GetFullPath(
+                Path.Combine(Application.dataPath, "..", "..", "Builds", "Android"));
+            Directory.CreateDirectory(buildDir);
+            string apkPath = Path.Combine(buildDir, "HeavyVehiclesWorld_v1.37-b7.apk");
+            Debug.Log($"[HVW_Batch] Building Android APK to: {apkPath}");
+
+            // Keystore
+            string ksPath = Path.GetFullPath(
+                Path.Combine(Application.dataPath, "..", "Keystore", "HVW_Production.keystore"));
+            PlayerSettings.Android.useCustomKeystore    = true;
+            PlayerSettings.Android.keystoreName        = ksPath;
+            PlayerSettings.Android.keystorePass        = "Shivraj@2026";
+            PlayerSettings.Android.keyaliasName        = "hvw_production";
+            PlayerSettings.Android.keyaliasPass        = "Shivraj@2026";
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            EditorUserBuildSettings.androidBuildSystem = AndroidBuildSystem.Gradle;
 
             var opts = new BuildPlayerOptions
             {
-                scenes           = scenes.ToArray(),
-                locationPathName = exePath,
-                target           = BuildTarget.StandaloneWindows64,
-                options          = BuildOptions.None,
+                scenes = GetScenes(), locationPathName = apkPath,
+                target = BuildTarget.Android, options = BuildOptions.None,
             };
-
             var report = BuildPipeline.BuildPlayer(opts);
-            if (report.summary.result == BuildResult.Succeeded)
-                Debug.Log($"[HVW_Batch] Windows build SUCCEEDED: {exePath}");
-            else
-                Debug.LogError($"[HVW_Batch] Windows build FAILED: {report.summary.result}");
+            Debug.Log(report.summary.result == BuildResult.Succeeded
+                ? $"[HVW_Batch] Android APK SUCCEEDED: {apkPath}  ({report.summary.totalSize / 1024 / 1024}MB)"
+                : $"[HVW_Batch] Android APK FAILED: {report.summary.result}");
         }
 
-        // ── COMBINED: apply steps + build Windows ───────────────────────────
-        public static void ApplyAllAndBuild()
+        // ── FULL PIPELINE: apply + Windows + Android ─────────────────────────
+        [MenuItem("HeavyVehiclesWorld/Batch - Full Pipeline (Steps 1+2 + Windows + Android)")]
+        public static void FullPipeline()
         {
             ApplyAllSteps();
             BuildWindows();
+            BuildAndroid();
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────
+        private static string[] GetScenes()
+        {
+            var scenes = new System.Collections.Generic.List<string>();
+            foreach (var s in EditorBuildSettings.scenes)
+                if (s.enabled) scenes.Add(s.path);
+            if (scenes.Count == 0) scenes.Add("Assets/Scenes/MainWorld.unity");
+            return scenes.ToArray();
         }
     }
 }

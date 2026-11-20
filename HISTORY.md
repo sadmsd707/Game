@@ -1879,3 +1879,32 @@ if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
 **Related to:** Step 3 (Lighting, Post-Processing, Vehicle Polish)
 
 ---
+
+---
+### Change #48 | 2026-11-20 | Step 4 — Build Stamp v1.37-b7, Android Build Script, Full Pipeline Menu
+
+**Files changed:**
+- `ProjectSettings/ProjectSettings.asset` (MODIFIED — bundleVersion 1.36.6→1.37.7, AndroidBundleVersionCode 6→7)
+- `Assets/Resources/hvw_build_info.json` (MODIFIED — buildNumber 7, versionString v1.37-b7)
+- `Assets/Editor/HVW_BatchAutomation.cs` (MODIFIED — added BuildAndroid(), FullPipeline(), fixed Windows build dir path)
+
+**What changed:**
+- Incremented build stamp to `v1.37-b7` (bundleVersionCode 7)
+- Added `HVW_BatchAutomation.BuildAndroid()`: builds signed APK to `Builds/Android/HeavyVehiclesWorld_v1.37-b7.apk` using keystore `Keystore/HVW_Production.keystore` (alias `hvw_production`, pass `Shivraj@2026`), ARM64, Gradle
+- Added `HVW_BatchAutomation.FullPipeline()`: single menu entry `HeavyVehiclesWorld → Batch - Full Pipeline` that runs Steps 1+2 apply, Windows build, Android build in sequence
+- Fixed Windows build dir path (was going 3 levels up, now correctly 2 levels from dataPath)
+- Unity batch mode requires Pro/Plus license for headless mode — cannot run from command line. All these menu items are available in the Unity Editor under `HeavyVehiclesWorld →` menu.
+
+**How to build the APK (you open Unity once):**
+1. Open Unity Editor with the HeavyVehiclesWorld project
+2. Wait for asset import (texture import of the 12 PNGs may take 1-2 min on first open)
+3. Run `HeavyVehiclesWorld → Step 2 - Apply Terrain Textures & Sky` (applies real PBR ground + HDRI sky)
+4. Run `HeavyVehiclesWorld → Step 1 - Import Vehicle Models` (links GLB models to vehicles)
+5. Run `HeavyVehiclesWorld → Build - Android APK (Step 4)` → APK saved to `Builds/Android/`
+   OR run `HeavyVehiclesWorld → Batch - Full Pipeline` to do steps 1+2+Windows+Android in one click
+
+**Status:** Code and build settings ready. APK requires you to open Unity (batch mode blocked by license). Screenshots require the APK/Windows build to run on device.
+
+**Related to:** Step 4 (APK with build stamp, screenshots, phone checklist)
+
+---
