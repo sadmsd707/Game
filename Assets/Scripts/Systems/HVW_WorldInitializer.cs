@@ -68,6 +68,13 @@ namespace HeavyVehiclesWorld.Systems
                 visGo.AddComponent<HVW_VisualSystem>();
             }
 
+            // Step 3 — Post-processing (Global Volume: ACES, Bloom, Color Grading, Vignette)
+            if (FindAnyObjectByType<HVW_PostProcessing>() == null)
+            {
+                var ppGo = new GameObject("HVW_PostProcessing");
+                ppGo.AddComponent<HVW_PostProcessing>();
+            }
+
             BuildWorldEnvironment();
             SpawnAllVehicles();
             SetupFollowCamera();
@@ -454,6 +461,9 @@ namespace HeavyVehiclesWorld.Systems
             var slot = root.AddComponent<VehicleModelSlot>();
             slot.modelSlot = modelGo.transform;
             slot.vehicleType = type;
+
+            // Step 3 — Headlights, brake lights, wheel dust
+            root.AddComponent<HVW_VehicleLights>();
 
             return root;
         }

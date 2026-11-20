@@ -53,6 +53,8 @@ namespace HeavyVehiclesWorld.Vehicles
         public float CurrentHealth => Mathf.Max(0f, 100f - damageLevel);
         public VehicleType Type => vehicleType;
         public bool isEngineOn => engineRunning;
+        /// <summary>True when the vehicle is actively braking (brakeInput > 0.1).</summary>
+        public bool IsBraking => brakeInput > 0.1f;
         public float SpeedKmh => currentSpeed * 3.6f;
 
         // ── Physics ───────────────────────────────────────────────────────

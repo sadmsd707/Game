@@ -1840,3 +1840,42 @@ if (targetRb != null && h.collider.attachedRigidbody == targetRb) continue;
 **Related to:** Step 2 (Real Ground, Road and Sky)
 
 ---
+
+---
+### Change #47 | 2026-11-20 | Step 3 — Post-Processing, Vehicle Lights, Wheel Dust
+
+**Files changed:**
+- `Assets/Scripts/Systems/HVW_PostProcessing.cs` (NEW)
+- `Assets/Scripts/Systems/HVW_VehicleLights.cs` (NEW)
+- `Assets/Scripts/Systems/HVW_WorldInitializer.cs` (MODIFIED — wires PostProcessing + VehicleLights)
+- `Assets/Scripts/Vehicles/VehicleController.cs` (MODIFIED — added `IsBraking` property)
+
+**What changed:**
+
+**HVW_PostProcessing.cs (NEW):**
+- Creates a URP Global Volume at runtime (priority 10, global) on a dedicated GameObject `HVW_PostProcessing`
+- Applies: Tonemapping (ACES), Bloom (threshold 0.85, intensity 0.35, scatter 0.70, low-quality for mobile), ColorAdjustments (exposure +0.1, contrast +15, saturation +18), WhiteBalance (neutral-cool 6500K), Vignette (intensity 0.22, smooth 0.45, rounded), FilmGrain (Thin1, 0.08 intensity)
+- Mobile-safe: no Depth of Field, no Chromatic Aberration, Bloom in low-quality mode
+- Injected by `HVW_WorldInitializer.Awake()` before `BuildWorldEnvironment()`
+
+**HVW_VehicleLights.cs (NEW):**
+- Added to every vehicle by `CreateVehicleEntity()` in `HVW_WorldInitializer`
+- Spot headlights (warm white, 2.0 intensity, 25m range, 55° cone, no shadows for perf)
+- Brake lights: `MaterialPropertyBlock` emission toggle on `BrakeLight_L/R` child renderers
+- Wheel dust: `ParticleSystem` per `WheelCollider`, dusty-tan colour, plays when `rb.velocity > 0.5 m/s`
+- Auto-builds all lights/dust on `Start()` if no Inspector references assigned
+
+**VehicleController.cs (MODIFIED):**
+- Added `public bool IsBraking => brakeInput > 0.1f;` convenience property
+
+**HVW_WorldInitializer.cs (MODIFIED):**
+- Awake: creates `HVW_PostProcessing` GameObject before world build
+- `CreateVehicleEntity()`: adds `HVW_VehicleLights` to each vehicle root
+
+**Why:** Vehicles looked flat without lighting. ACES tonemapping removes the yellow blowout and lifts dark areas. Bloom makes headlights and sky feel bright. Vehicle lights make it look like a real game, not a demo.
+
+**Status:** Code written and compiled. Visual proof requires Unity Play mode / standalone build.
+
+**Related to:** Step 3 (Lighting, Post-Processing, Vehicle Polish)
+
+---
