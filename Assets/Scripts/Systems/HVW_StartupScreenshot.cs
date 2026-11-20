@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using UnityEngine;
+using HeavyVehiclesWorld.Vehicles;
 
 namespace HeavyVehiclesWorld.Systems
 {
